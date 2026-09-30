@@ -5,7 +5,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseEmpty, BasePage, BaseSearchBox, Switch } from '@/components/base'
-import { compareRulesByHostLevel } from '@/components/profile/rule-fields'
+import {
+  compareRulesByHostLevel,
+  moveItem,
+} from '@/components/profile/rule-fields'
 import {
   findFirstNonEmptyRulesUid,
   readSeqRulesDocument,
@@ -14,6 +17,7 @@ import {
 } from '@/components/profile/seq-rules-document'
 import {
   type SeqRuleRow,
+  type SeqRuleSource,
   SeqRulesTable,
 } from '@/components/profile/seq-rules-table'
 import { useSeqRuleConfig } from '@/components/profile/use-seq-rule-config'
@@ -140,6 +144,43 @@ const CustomRulesPage = () => {
     }
   })
 
+  /** 拖动排序后立即写回文件 */
+  const handleReorderRule = useLockFn(
+    async (source: SeqRuleSource, from: number, to: number) => {
+      if (!rulesProperty) return
+
+      const list = source === 'prepend' ? prependSeq : appendSeq
+      const moved = moveItem(list, from, to)
+      const nextPrepend = source === 'prepend' ? moved : prependSeq
+      const nextAppend = source === 'append' ? moved : appendSeq
+
+      try {
+        const { config } = await readSeqRulesDocument(rulesProperty)
+        const current = toSeqConfig(config)
+
+        const saved = await saveProfileFile(
+          rulesProperty,
+          serializeSeqRules({
+            ...current,
+            prepend: nextPrepend,
+            append: nextAppend,
+          }),
+        )
+
+        // 校验失败时后端已回滚并提示，这里让列表回到文件里的顺序
+        if (!saved) {
+          setPrependSeq((prev) => [...prev])
+          return
+        }
+
+        setPrependSeq(nextPrepend)
+        setAppendSeq(nextAppend)
+      } catch (err: any) {
+        showNotice.error(err)
+      }
+    },
+  )
+
   /** 开关即保存，写回后由后端校验并应用到运行时 */
   const handleExcludeChange = useLockFn(async (next: boolean) => {
     if (!rulesProperty) return
@@ -263,8 +304,12 @@ const CustomRulesPage = () => {
             <Box sx={{ height: 'calc(100% - 32px)', marginTop: '8px' }}>
               <SeqRulesTable
                 rows={filteredRows}
+                sortable={order === 'original'}
                 onDelete={(row) => {
                   void handleDeleteRule(row)
+                }}
+                onReorder={(source, from, to) => {
+                  void handleReorderRule(source, from, to)
                 }}
               />
             </Box>

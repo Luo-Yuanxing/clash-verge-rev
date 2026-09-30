@@ -42,3 +42,15 @@ export const compareRulesByHostLevel = (
 
   return keyA.localeCompare(keyB)
 }
+
+/** 把 from 位置的元素移动到 to 位置，返回新数组 */
+export const moveItem = <T>(list: T[], from: number, to: number): T[] => {
+  if (from === to || from < 0 || from >= list.length) return list
+
+  const next = [...list]
+  const [item] = next.splice(from, 1)
+  if (item === undefined) return list
+
+  next.splice(to, 0, item)
+  return next
+}
