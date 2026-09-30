@@ -1,4 +1,4 @@
-import { Checkbox, MenuItem, Select } from '@mui/material'
+import { Checkbox } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { useLocalStorage } from 'foxact/use-local-storage'
 import {
@@ -269,59 +269,6 @@ const selectCellStyle = {
   justifyContent: 'center',
 } as const
 
-interface ChainFilterSelectProps {
-  /** 列名，点击整列标题即唤起下拉 */
-  label: string
-  value: string
-  /** 当前列表中出现的链路种类，选项与之一一对应 */
-  options: string[]
-  onChange: (chain: string) => void
-}
-
-/** 表头“链路”列的下拉筛选，空串表示全部 */
-const ChainFilterSelect = (props: ChainFilterSelectProps) => {
-  const { label, value, options, onChange } = props
-  const { t } = useTranslation()
-  const allChains = t('connections.components.chains.all')
-
-  return (
-    <Select
-      variant="standard"
-      disableUnderline
-      size="small"
-      displayEmpty
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      aria-label={t('connections.components.chains.filter')}
-      renderValue={() => (
-        <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</span>
-      )}
-      sx={{
-        flex: 1,
-        minWidth: 0,
-        fontSize: 13,
-        color: 'inherit',
-        '& .MuiSelect-select': {
-          py: 1,
-          pl: 1,
-          pr: '18px !important',
-          display: 'flex',
-          alignItems: 'center',
-        },
-      }}
-    >
-      <MenuItem value="" dense>
-        <span style={{ fontSize: 13 }}>{allChains}</span>
-      </MenuItem>
-      {options.map((chain) => (
-        <MenuItem key={chain} value={chain} dense>
-          <span style={{ fontSize: 13 }}>{chain}</span>
-        </MenuItem>
-      ))}
-    </Select>
-  )
-}
-
 interface RowComponentProps {
   row: IConnectionsItem
   columns: DisplayColumn[]
@@ -423,11 +370,6 @@ interface Props {
   selectedIds: ReadonlySet<string>
   onToggleSelect: (id: string) => void
   onToggleSelectAll: (ids: string[]) => void
-  /** 链路筛选，空串表示全部 */
-  chainFilter: string
-  /** 当前列表中出现的链路种类 */
-  chainOptions: string[]
-  onChainFilterChange: (chain: string) => void
 }
 
 export const ConnectionTable = (props: Props) => {
@@ -439,9 +381,6 @@ export const ConnectionTable = (props: Props) => {
     selectedIds,
     onToggleSelect,
     onToggleSelectAll,
-    chainFilter,
-    chainOptions,
-    onChainFilterChange,
   } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
@@ -530,8 +469,9 @@ export const ConnectionTable = (props: Props) => {
       {
         field: 'chains',
         headerName: t('connections.components.fields.chains'),
-        width: 120,
-        minWidth: 90,
+        width: 84,
+        minWidth: 72,
+        maxWidth: 84,
       },
       {
         field: 'rule',
@@ -683,13 +623,24 @@ export const ConnectionTable = (props: Props) => {
     const scale = available / total
     let used = 0
     return columns.map((column, index) => {
+      const scaled = Math.floor(column.size * scale)
+      const bounded =
+        column.maxWidth === undefined
+          ? scaled
+          : Math.min(column.maxWidth, scaled)
       // 最后一列吸收取整余量，避免总和超出容器
       if (index === columns.length - 1) {
-        return { ...column, size: available - used }
+        const rest = available - used
+        return {
+          ...column,
+          size:
+            column.maxWidth === undefined
+              ? rest
+              : Math.min(column.maxWidth, rest),
+        }
       }
-      const size = Math.floor(column.size * scale)
-      used += size
-      return { ...column, size }
+      used += bounded
+      return { ...column, size: bounded }
     })
   }, [columnVisibilityModel, orderedColumns, autoColumnWidths, viewport.width])
 
@@ -936,44 +887,32 @@ export const ConnectionTable = (props: Props) => {
                       userSelect: 'none',
                     }}
                   >
-                    {column.field === 'chains' ? (
-                      <ChainFilterSelect
-                        label={column.headerName}
-                        value={chainFilter}
-                        options={chainOptions}
-                        onChange={onChainFilterChange}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => toggleSorting(column.field)}
-                        style={{
-                          flex: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent:
-                            column.align === 'right'
-                              ? 'flex-end'
-                              : 'flex-start',
-                          gap: 4,
-                          padding: 8,
-                          border: 0,
-                          background: 'transparent',
-                          color: 'inherit',
-                          font: 'inherit',
-                          textAlign:
-                            column.align === 'right' ? 'right' : 'left',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {column.headerName}
-                        {sorting?.id === column.field
-                          ? sorting.desc
-                            ? '▼'
-                            : '▲'
-                          : null}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleSorting(column.field)}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent:
+                          column.align === 'right' ? 'flex-end' : 'flex-start',
+                        gap: 4,
+                        padding: 8,
+                        border: 0,
+                        background: 'transparent',
+                        color: 'inherit',
+                        font: 'inherit',
+                        textAlign: column.align === 'right' ? 'right' : 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {column.headerName}
+                      {sorting?.id === column.field
+                        ? sorting.desc
+                          ? '▼'
+                          : '▲'
+                        : null}
+                    </button>
                   </div>
                 ))}
               </div>

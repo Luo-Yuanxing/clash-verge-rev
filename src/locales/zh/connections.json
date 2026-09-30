@@ -38,10 +38,6 @@
       "excludeIp": "排除 IP 连接",
       "hideCovered": "隐藏已被自定义规则覆盖的主机"
     },
-    "chains": {
-      "all": "全部链路",
-      "filter": "按链路筛选"
-    },
     "columnManager": {
       "title": "列设置",
       "dragHandle": "拖拽控件"

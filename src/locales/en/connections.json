@@ -38,10 +38,6 @@
       "excludeIp": "Exclude IP connections",
       "hideCovered": "Hide hosts covered by custom rules"
     },
-    "chains": {
-      "all": "All chains",
-      "filter": "Filter by chain"
-    },
     "columnManager": {
       "title": "Columns",
       "dragHandle": "Drag handle"

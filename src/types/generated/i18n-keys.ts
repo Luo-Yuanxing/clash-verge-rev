@@ -28,8 +28,6 @@ export const translationKeys = [
   'connections.components.filters.title',
   'connections.components.filters.excludeIp',
   'connections.components.filters.hideCovered',
-  'connections.components.chains.all',
-  'connections.components.chains.filter',
   'connections.components.columnManager.title',
   'connections.components.columnManager.dragHandle',
   'connections.components.ruleDialog.title',

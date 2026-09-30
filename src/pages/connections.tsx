@@ -39,7 +39,6 @@ import { ConnectionFilterDialog } from '@/components/connection/connection-filte
 import { mergeHistoryConnections } from '@/components/connection/connection-history-merge'
 import { ConnectionRowItem } from '@/components/connection/connection-row-item'
 import {
-  formatConnectionChains,
   getConnectionStartTime,
   useConnectionRowViews,
 } from '@/components/connection/connection-row-view'
@@ -117,8 +116,6 @@ const ConnectionsPage = () => {
   const [curOrderOpt, setCurOrderOpt] = useState<OrderKey>('default')
   const [connectionsType, setConnectionsType] =
     useState<ConnectionsType>('active')
-  /** 按链路筛选，空串表示全部链路 */
-  const [curChain, setCurChain] = useState('')
 
   const {
     response: { data: connections },
@@ -222,28 +219,10 @@ const ConnectionsPage = () => {
     return ids
   }, [viewConnections])
 
-  /** 当前列表里出现过的链路种类，下拉选项与之一一对应 */
-  const chainOptions = useMemo(() => {
-    const chains = new Set<string>()
-    for (const connection of selectedConnections) {
-      const chain = formatConnectionChains(connection.chains)
-      if (chain) chains.add(chain)
-    }
-    return [...chains].sort((a, b) => a.localeCompare(b))
-  }, [selectedConnections])
-
-  /** 列表中仍存在的链路，否则视为“全部链路” */
-  const activeChain = chainOptions.includes(curChain) ? curChain : ''
-
   const filterConn = useMemo(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
 
     let list = selectedConnections
-    if (activeChain) {
-      list = list.filter(
-        (conn) => formatConnectionChains(conn.chains) === activeChain,
-      )
-    }
     if (connectionsType === 'history' && hideCovered) {
       list = list.filter((conn) => !isHostCovered(conn.metadata?.host ?? ''))
     }
@@ -265,7 +244,6 @@ const ConnectionsPage = () => {
     hasSearch,
     match,
     curOrderOpt,
-    activeChain,
     connectionsType,
     hideCovered,
     isHostCovered,
@@ -501,28 +479,6 @@ const ConnectionsPage = () => {
             ))}
           </BaseStyledSelect>
         )}
-        {!isTableLayout && (
-          <BaseStyledSelect
-            value={activeChain}
-            displayEmpty
-            onChange={(e) => setCurChain(e.target.value)}
-            renderValue={(selected) =>
-              selected || t('connections.components.chains.all')
-            }
-            aria-label={t('connections.components.chains.filter')}
-          >
-            <MenuItem value="">
-              <span style={{ fontSize: 14 }}>
-                {t('connections.components.chains.all')}
-              </span>
-            </MenuItem>
-            {chainOptions.map((chain) => (
-              <MenuItem key={chain} value={chain}>
-                <span style={{ fontSize: 14 }}>{chain}</span>
-              </MenuItem>
-            ))}
-          </BaseStyledSelect>
-        )}
         <Box
           sx={{
             flex: 1,
@@ -596,9 +552,6 @@ const ConnectionsPage = () => {
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
-          chainFilter={activeChain}
-          chainOptions={chainOptions}
-          onChainFilterChange={setCurChain}
         />
       ) : (
         <VirtualList
