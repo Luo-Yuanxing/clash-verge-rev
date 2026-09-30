@@ -641,6 +641,10 @@ export interface TranslationResources {
         page: {
           emptyProfile: string
           emptyRules: string
+          excludeSubscription: {
+            hint: string
+            label: string
+          }
           title: string
         }
       }

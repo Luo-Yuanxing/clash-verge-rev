@@ -3,7 +3,11 @@
     "page": {
       "title": "Custom Rules",
       "emptyProfile": "No profile has a custom rules file yet",
-      "emptyRules": "No custom rules in this profile yet"
+      "emptyRules": "No custom rules in this profile yet",
+      "excludeSubscription": {
+        "label": "Exclude subscription rules",
+        "hint": "Only custom rules apply; unmatched requests go DIRECT"
+      }
     }
   },
   "page": {

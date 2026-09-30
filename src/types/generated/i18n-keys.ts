@@ -370,6 +370,8 @@ export const translationKeys = [
   'rules.custom.page.title',
   'rules.custom.page.emptyProfile',
   'rules.custom.page.emptyRules',
+  'rules.custom.page.excludeSubscription.label',
+  'rules.custom.page.excludeSubscription.hint',
   'rules.page.provider.trigger',
   'rules.page.provider.dialogTitle',
   'rules.page.provider.actions.updateAll',
