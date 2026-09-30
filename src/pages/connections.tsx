@@ -102,6 +102,9 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
 
 const EMPTY_CONNECTIONS: IConnectionsItem[] = []
 
+/** 工具条上的按钮与下拉不参与压缩，空间不够时整块换到下一行 */
+const TOOLBAR_ITEM_SHRINK = { flexShrink: 0 } as const
+
 /** 目标是不是裸 IP：没有主机名，或主机名本身就是 IP */
 const isIpConnection = (connection: IConnectionsItem) => {
   const { host, destinationIP, remoteDestination } = connection.metadata
@@ -436,6 +439,7 @@ const ConnectionsPage = () => {
           mx: '10px',
           minHeight: '36px',
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
           gap: 1,
           userSelect: 'text',
@@ -444,7 +448,8 @@ const ConnectionsPage = () => {
           zIndex: 2,
         }}
       >
-        <ButtonGroup sx={{ mr: 1, flexBasis: 'content' }}>
+        {/* 第一组：列表切换、时间窗口、筛选与主动探测 */}
+        <ButtonGroup sx={{ mr: 1, flexShrink: 0 }}>
           <Button
             size="small"
             variant={connectionsType === 'history' ? 'contained' : 'outlined'}
@@ -480,7 +485,7 @@ const ConnectionsPage = () => {
                 historyWindowMs: Number(e.target.value),
               }))
             }
-            sx={{ mr: 1, flexBasis: 'content' }}
+            sx={{ mr: 1, flexShrink: 0 }}
           >
             {HISTORY_WINDOW_OPTIONS.map((windowMs) => (
               <MenuItem key={windowMs} value={windowMs}>
@@ -515,7 +520,7 @@ const ConnectionsPage = () => {
               : 'connections.components.actions.probe',
           )}
         >
-          <span style={{ flex: '0 0 auto' }}>
+          <span style={TOOLBAR_ITEM_SHRINK}>
             <Button
               size="small"
               variant="outlined"
@@ -523,7 +528,7 @@ const ConnectionsPage = () => {
               disabled={probeTargets.length === 0}
               loading={probingCount > 0}
               onClick={() => void runProbe()}
-              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+              sx={{ whiteSpace: 'nowrap' }}
             >
               {/* 文字固定占一行，内容多时只压缩其他控件 */}
               <span style={{ whiteSpace: 'nowrap' }}>
@@ -536,6 +541,7 @@ const ConnectionsPage = () => {
           <BaseStyledSelect
             value={curOrderOpt}
             onChange={(e) => setCurOrderOpt(e.target.value as OrderKey)}
+            sx={TOOLBAR_ITEM_SHRINK}
           >
             {ORDER_OPTIONS.map((option) => (
               <MenuItem key={option.id} value={option.id}>
@@ -544,29 +550,34 @@ const ConnectionsPage = () => {
             ))}
           </BaseStyledSelect>
         )}
+        {/* 第二组：搜索与创建规则、暂停、列设置 */}
         <Box
           sx={{
-            flex: 1,
+            flex: '1 1 320px',
+            minWidth: 200,
             display: 'flex',
             alignItems: 'center',
-            '& > *': {
-              flex: 1,
-            },
+            gap: 1,
+            '& > *': { flex: 1 },
           }}
         >
           <BaseSearchBox onSearch={handleSearch} />
         </Box>
-        <Button
-          size="small"
-          variant="contained"
-          startIcon={<RuleRounded fontSize="small" />}
-          disabled={ruleHosts.length === 0}
-          onClick={() => setIsRuleDialogOpen(true)}
-          sx={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}
-        >
-          {t('connections.components.actions.createRule')}
-          {ruleHosts.length > 0 ? ` (${ruleHosts.length})` : ''}
-        </Button>
+        <span style={TOOLBAR_ITEM_SHRINK}>
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<RuleRounded fontSize="small" />}
+            disabled={ruleHosts.length === 0}
+            onClick={() => setIsRuleDialogOpen(true)}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            <span style={{ whiteSpace: 'nowrap' }}>
+              {t('connections.components.actions.createRule')}
+              {ruleHosts.length > 0 ? ` (${ruleHosts.length})` : ''}
+            </span>
+          </Button>
+        </span>
         <Tooltip
           title={t(
             paused
@@ -583,7 +594,7 @@ const ConnectionsPage = () => {
                 : 'connections.components.actions.pause',
             )}
             onClick={togglePause}
-            sx={{ flex: '0 0 auto' }}
+            sx={TOOLBAR_ITEM_SHRINK}
           >
             {paused ? (
               <PlayArrowRounded fontSize="small" />
@@ -598,7 +609,7 @@ const ConnectionsPage = () => {
               size="small"
               aria-label={t('connections.components.columnManager.title')}
               onClick={() => setIsColumnManagerOpen(true)}
-              sx={{ flex: '0 0 auto' }}
+              sx={TOOLBAR_ITEM_SHRINK}
             >
               <ViewColumnRounded fontSize="small" />
             </IconButton>
