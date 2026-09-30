@@ -25,6 +25,7 @@ import {
   serializeSeqRules,
   toSeqConfig,
 } from '@/components/profile/seq-rules-document'
+import { useProfiles } from '@/hooks/use-profiles'
 import { saveProfileFile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
@@ -32,12 +33,17 @@ const RULE_TYPES = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD'] as const
 
 type RuleType = (typeof RULE_TYPES)[number]
 
-/** PROXY 为占位符，实际写入用户在该页面选择的代理组名 */
+/** PROXY 为占位符，实际写入用户选择的代理组名 */
 const POLICY_OPTIONS = ['DIRECT', 'REJECT', 'REJECT-DROP', 'PROXY'] as const
 
 type PolicyOption = (typeof POLICY_OPTIONS)[number]
 
 const MAX_PREVIEW_RULES = 20
+
+/** 记住上次使用的订阅，作为下次的默认值 */
+const PROFILE_STORAGE_KEY = 'connection-rule-profile-uid'
+/** 记住上次使用的代理组，作为下次的默认值 */
+const PROXY_GROUP_STORAGE_KEY = 'connection-rule-proxy-group'
 
 interface Props {
   open: boolean
@@ -45,23 +51,52 @@ interface Props {
   hosts: string[]
   /** 因是 IP 而被跳过的主机数量 */
   skippedCount: number
-  /** 当前订阅启用中的自定义规则文件的 property */
-  rulesProperty?: string
   onClose: () => void
   onCreated?: (count: number) => void
 }
 
 export const ConnectionRuleDialog = (props: Props) => {
-  const { open, hosts, skippedCount, rulesProperty, onClose, onCreated } = props
+  const { open, hosts, skippedCount, onClose, onCreated } = props
   const { t } = useTranslation()
+
+  const { profiles, current } = useProfiles()
+
+  const items = useMemo(
+    () =>
+      (profiles?.items ?? []).filter(
+        (item): item is IProfileItem => !!item && !!item.option?.rules,
+      ),
+    [profiles],
+  )
 
   const [ruleType, setRuleType] = useState<RuleType>(RULE_TYPES[0])
   const [policyOption, setPolicyOption] = useState<PolicyOption>('DIRECT')
   const [proxyGroups, setProxyGroups] = useState<string[]>([])
-  const [proxyGroup, setProxyGroup] = useLocalStorage(
-    'connection-rule-proxy-group',
+  const [pickedUid, setPickedUid] = useLocalStorage(PROFILE_STORAGE_KEY, '')
+  const [pickedGroup, setPickedGroup] = useLocalStorage(
+    PROXY_GROUP_STORAGE_KEY,
     '',
   )
+
+  const selectedUid = useMemo(() => {
+    if (pickedUid && items.some((item) => item.uid === pickedUid)) {
+      return pickedUid
+    }
+    return (
+      items.find((item) => item.uid === current?.uid)?.uid ??
+      items[0]?.uid ??
+      ''
+    )
+  }, [pickedUid, items, current])
+
+  const rulesProperty = items.find((item) => item.uid === selectedUid)?.option
+    ?.rules
+
+  /** 默认使用上次选择的代理组，否则用第一个可用代理组 */
+  const selectedGroup = useMemo(() => {
+    if (pickedGroup && proxyGroups.includes(pickedGroup)) return pickedGroup
+    return proxyGroups[0] ?? ''
+  }, [pickedGroup, proxyGroups])
 
   useEffect(() => {
     if (!open) return
@@ -86,8 +121,7 @@ export const ConnectionRuleDialog = (props: Props) => {
     }
   }, [open])
 
-  const resolvedPolicy =
-    policyOption === 'PROXY' ? (proxyGroup ?? '') : policyOption
+  const resolvedPolicy = policyOption === 'PROXY' ? selectedGroup : policyOption
 
   const rules = useMemo(
     () => hosts.map((host) => `${ruleType},${host},${resolvedPolicy}`),
@@ -101,7 +135,7 @@ export const ConnectionRuleDialog = (props: Props) => {
       )
       return
     }
-    if (policyOption === 'PROXY' && !proxyGroup) {
+    if (policyOption === 'PROXY' && !selectedGroup) {
       showNotice.error(
         t('connections.components.ruleDialog.errors.proxyGroupRequired'),
       )
@@ -151,6 +185,7 @@ export const ConnectionRuleDialog = (props: Props) => {
           count: created.length,
         }),
       )
+      setPickedUid(selectedUid)
       onCreated?.(created.length)
       onClose()
     } catch (err) {
@@ -165,6 +200,26 @@ export const ConnectionRuleDialog = (props: Props) => {
       <DialogTitle>{t('connections.components.ruleDialog.title')}</DialogTitle>
       <DialogContent>
         <List sx={{ padding: 0 }}>
+          <Item>
+            <ListItemText
+              primary={t('connections.components.ruleDialog.labels.profile')}
+            />
+            <TextField
+              select
+              size="small"
+              sx={{ minWidth: 240 }}
+              value={selectedUid}
+              disabled={items.length === 0}
+              onChange={(event) => setPickedUid(event.target.value)}
+            >
+              {items.map((item) => (
+                <MenuItem key={item.uid} value={item.uid}>
+                  {item.name ?? item.uid}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Item>
+
           <Item>
             <ListItemText primary={t('rules.modals.editor.form.labels.type')} />
             <TextField
@@ -216,8 +271,8 @@ export const ConnectionRuleDialog = (props: Props) => {
                 size="small"
                 sx={{ minWidth: 240 }}
                 options={proxyGroups}
-                value={proxyGroup || null}
-                onChange={(_, value) => setProxyGroup(value ?? '')}
+                value={selectedGroup || null}
+                onChange={(_, value) => setPickedGroup(value ?? '')}
                 renderInput={(params) => <TextField {...params} />}
               />
             </Item>

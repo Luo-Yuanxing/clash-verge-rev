@@ -36,6 +36,7 @@
     "ruleDialog": {
       "title": "Create rules from connections",
       "labels": {
+        "profile": "Profile",
         "proxyGroup": "Proxy group"
       },
       "policies": {

@@ -43,7 +43,6 @@ import { ConnectionRuleDialog } from '@/components/connection/connection-rule-di
 import { ConnectionTable } from '@/components/connection/connection-table'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useConnectionSetting } from '@/hooks/use-connection-setting'
-import { useProfiles } from '@/hooks/use-profiles'
 import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVisibility } from '@/hooks/use-visibility'
 import { isIpAddress } from '@/utils/network'
@@ -115,9 +114,6 @@ const ConnectionsPage = () => {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   )
-
-  const { current } = useProfiles()
-  const rulesProperty = current?.option?.rules
 
   const frozenRef = useRef<{
     activeConnections: IConnectionsItem[]
@@ -448,7 +444,6 @@ const ConnectionsPage = () => {
         open={isRuleDialogOpen}
         hosts={ruleHosts}
         skippedCount={skippedHosts}
-        rulesProperty={rulesProperty}
         onClose={() => setIsRuleDialogOpen(false)}
         onCreated={() => setSelectedIds(new Set())}
       />

@@ -26,6 +26,7 @@ export const translationKeys = [
   'connections.components.columnManager.title',
   'connections.components.columnManager.dragHandle',
   'connections.components.ruleDialog.title',
+  'connections.components.ruleDialog.labels.profile',
   'connections.components.ruleDialog.labels.proxyGroup',
   'connections.components.ruleDialog.policies.PROXY',
   'connections.components.ruleDialog.positionHint',

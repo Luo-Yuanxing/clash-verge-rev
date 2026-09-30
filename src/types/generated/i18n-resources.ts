@@ -46,6 +46,7 @@ export interface TranslationResources {
             saveFailed: string
           }
           labels: {
+            profile: string
             proxyGroup: string
           }
           more: string

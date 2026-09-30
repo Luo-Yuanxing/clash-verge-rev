@@ -36,6 +36,7 @@
     "ruleDialog": {
       "title": "一键创建规则",
       "labels": {
+        "profile": "订阅",
         "proxyGroup": "代理组"
       },
       "policies": {
