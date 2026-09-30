@@ -523,9 +523,12 @@ const ConnectionsPage = () => {
               disabled={probeTargets.length === 0}
               loading={probingCount > 0}
               onClick={() => void runProbe()}
-              sx={{ whiteSpace: 'nowrap' }}
+              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
             >
-              {t('connections.components.actions.probe')}
+              {/* 文字固定占一行，内容多时只压缩其他控件 */}
+              <span style={{ whiteSpace: 'nowrap' }}>
+                {t('connections.components.actions.probe')}
+              </span>
             </Button>
           </span>
         </Tooltip>
