@@ -1,4 +1,3 @@
-import { FilterListRounded } from '@mui/icons-material'
 import { Checkbox, MenuItem, Select } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { useLocalStorage } from 'foxact/use-local-storage'
@@ -256,6 +255,8 @@ const selectCellStyle = {
 } as const
 
 interface ChainFilterSelectProps {
+  /** 列名，点击整列标题即唤起下拉 */
+  label: string
   value: string
   /** 当前列表中出现的链路种类，选项与之一一对应 */
   options: string[]
@@ -264,7 +265,7 @@ interface ChainFilterSelectProps {
 
 /** 表头“链路”列的下拉筛选，空串表示全部 */
 const ChainFilterSelect = (props: ChainFilterSelectProps) => {
-  const { value, options, onChange } = props
+  const { label, value, options, onChange } = props
   const { t } = useTranslation()
   const allChains = t('connections.components.chains.all')
 
@@ -286,12 +287,10 @@ const ChainFilterSelect = (props: ChainFilterSelectProps) => {
             minWidth: 0,
           }}
         >
-          <FilterListRounded
-            sx={{ fontSize: 16, opacity: selected ? 1 : 0.5 }}
-          />
+          <span style={{ fontWeight: 600 }}>{label}</span>
           <span
             style={{
-              fontSize: 12,
+              fontWeight: 400,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -302,10 +301,17 @@ const ChainFilterSelect = (props: ChainFilterSelectProps) => {
         </span>
       )}
       sx={{
-        flex: '0 0 auto',
-        maxWidth: '55%',
-        mr: 0.75,
-        '& .MuiSelect-select': { py: 0, pr: '16px !important' },
+        flex: 1,
+        minWidth: 0,
+        fontSize: 13,
+        color: 'inherit',
+        '& .MuiSelect-select': {
+          py: 1,
+          pl: 1,
+          pr: '18px !important',
+          display: 'flex',
+          alignItems: 'center',
+        },
       }}
     >
       <MenuItem value="" dense>
@@ -945,38 +951,43 @@ export const ConnectionTable = (props: Props) => {
                       userSelect: 'none',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => toggleSorting(column.field)}
-                      style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent:
-                          column.align === 'right' ? 'flex-end' : 'flex-start',
-                        gap: 4,
-                        padding: 8,
-                        border: 0,
-                        background: 'transparent',
-                        color: 'inherit',
-                        font: 'inherit',
-                        textAlign: column.align === 'right' ? 'right' : 'left',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {column.headerName}
-                      {sorting?.id === column.field
-                        ? sorting.desc
-                          ? '▼'
-                          : '▲'
-                        : null}
-                    </button>
-                    {column.field === 'chains' && (
+                    {column.field === 'chains' ? (
                       <ChainFilterSelect
+                        label={column.headerName}
                         value={chainFilter}
                         options={chainOptions}
                         onChange={onChainFilterChange}
                       />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => toggleSorting(column.field)}
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent:
+                            column.align === 'right'
+                              ? 'flex-end'
+                              : 'flex-start',
+                          gap: 4,
+                          padding: 8,
+                          border: 0,
+                          background: 'transparent',
+                          color: 'inherit',
+                          font: 'inherit',
+                          textAlign:
+                            column.align === 'right' ? 'right' : 'left',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {column.headerName}
+                        {sorting?.id === column.field
+                          ? sorting.desc
+                            ? '▼'
+                            : '▲'
+                          : null}
+                      </button>
                     )}
                     <div
                       onMouseDown={(event) =>
