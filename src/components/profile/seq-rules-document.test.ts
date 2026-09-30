@@ -2,7 +2,9 @@ import * as yaml from 'js-yaml'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  applyRuleEnabled,
   findFirstNonEmptyRulesUid,
+  removeSeqRule,
   type SeqRulesConfig,
   type SeqRulesDocument,
   serializeSeqRules,
@@ -89,5 +91,73 @@ describe('serializeSeqRules', () => {
     const parsed = yaml.load(serializeSeqRules(config()))
 
     expect(parsed).not.toHaveProperty('disabled')
+  })
+})
+
+describe('applyRuleEnabled', () => {
+  it('moves a rule out of its sequence when it is turned off', () => {
+    const next = applyRuleEnabled(
+      config({ prepend: ['DOMAIN,on.com,DIRECT', 'MATCH,DIRECT'] }),
+      [{ rule: 'DOMAIN,on.com,DIRECT', source: 'prepend', enabled: true }],
+      false,
+    )
+
+    expect(next.prepend).toEqual(['MATCH,DIRECT'])
+    expect(next.disabled.prepend).toEqual(['DOMAIN,on.com,DIRECT'])
+  })
+
+  it('moves a rule back to its own sequence when it is turned on', () => {
+    const next = applyRuleEnabled(
+      config({
+        append: ['MATCH,DIRECT'],
+        disabled: { prepend: [], append: ['DOMAIN,off.com,DIRECT'] },
+      }),
+      [{ rule: 'DOMAIN,off.com,DIRECT', source: 'append', enabled: false }],
+      true,
+    )
+
+    expect(next.disabled.append).toEqual([])
+    expect(next.append).toEqual(['MATCH,DIRECT', 'DOMAIN,off.com,DIRECT'])
+  })
+
+  it('toggles every target in one pass', () => {
+    const next = applyRuleEnabled(
+      config({
+        prepend: ['DOMAIN,a.com,DIRECT'],
+        append: ['DOMAIN,b.com,DIRECT'],
+      }),
+      [
+        { rule: 'DOMAIN,a.com,DIRECT', source: 'prepend', enabled: true },
+        { rule: 'DOMAIN,b.com,DIRECT', source: 'append', enabled: true },
+      ],
+      false,
+    )
+
+    expect(next.prepend).toEqual([])
+    expect(next.append).toEqual([])
+    expect(next.disabled).toEqual({
+      prepend: ['DOMAIN,a.com,DIRECT'],
+      append: ['DOMAIN,b.com,DIRECT'],
+    })
+  })
+})
+
+describe('removeSeqRule', () => {
+  it('drops an enabled rule from its sequence', () => {
+    const next = removeSeqRule(
+      config({ prepend: ['DOMAIN,a.com,DIRECT', 'MATCH,DIRECT'] }),
+      { rule: 'DOMAIN,a.com,DIRECT', source: 'prepend', enabled: true },
+    )
+
+    expect(next.prepend).toEqual(['MATCH,DIRECT'])
+  })
+
+  it('drops a closed rule from disabled', () => {
+    const next = removeSeqRule(
+      config({ disabled: { prepend: [], append: ['DOMAIN,off.com,DIRECT'] } }),
+      { rule: 'DOMAIN,off.com,DIRECT', source: 'append', enabled: false },
+    )
+
+    expect(next.disabled.append).toEqual([])
   })
 })
