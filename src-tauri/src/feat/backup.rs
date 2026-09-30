@@ -16,10 +16,12 @@ use reqwest_dav::list_cmd::ListFile;
 use serde::Serialize;
 use smartstring::alias::String;
 use std::{
+    collections::{HashMap, HashSet},
     io::{Read as _, Write as _},
     path::PathBuf,
 };
 use tokio::fs;
+use zip::write::SimpleFileOptions;
 
 /// Version tag of the quick-config backup payload: `cv1:` + Base64(Deflate(zip)).
 const QUICK_CONFIG_PREFIX: &str = "cv1:";
@@ -258,9 +260,25 @@ pub async fn import_local_backup(source: String) -> Result<String> {
     Ok(file_name.to_string().into())
 }
 
-/// Read a local backup file as a compressed Base64 payload for quick-config sharing.
+/// Settings-only share payload plus the custom rules of every subscription.
+#[derive(Debug, Serialize)]
+pub struct RuledBackupPayload {
+    /// `cv1:` + Base64(Deflate(settings zip)), subscription entries stripped.
+    pub settings: String,
+    pub rules: Vec<RuledBackupRule>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RuledBackupRule {
+    pub name: String,
+    pub content: String,
+}
+
+/// Read a local backup as a shareable payload: settings keep every file except the
+/// subscriptions (`profiles/`, `profiles.yaml`), and the rules travel as text so the
+/// import can attach them to a freshly created profile instead of restoring a backup.
 #[tracing::instrument(skip_all, level = "info", fields(filename = %filename))]
-pub async fn read_local_backup_base64(filename: String) -> Result<String> {
+pub async fn read_local_backup_base64(filename: String) -> Result<RuledBackupPayload> {
     let backup_dir = local_backup_dir()?;
     let target_path = backup_dir.join(filename.as_str());
     if !target_path.exists() {
@@ -268,11 +286,73 @@ pub async fn read_local_backup_base64(filename: String) -> Result<String> {
     }
 
     let bytes = fs::read(&target_path).await?;
+    let reader = std::io::Cursor::new(bytes);
+    let mut archive = zip::ZipArchive::new(reader)?;
+    let mut settings = Vec::new();
+    let mut contents: HashMap<std::string::String, std::string::String> = HashMap::new();
+
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index)?;
+        let name = entry.name().to_owned();
+        if name.starts_with("profiles/") || name == "profiles.yaml" {
+            continue;
+        }
+
+        let mut buffer = Vec::new();
+        entry.read_to_end(&mut buffer)?;
+        if let Ok(text) = std::str::from_utf8(&buffer) {
+            contents.insert(name.clone().into(), text.into());
+        }
+        settings.push((name, buffer));
+    }
+
+    let mut rules = Vec::new();
+    let mut seen: HashSet<std::string::String> = HashSet::new();
+    let profile_items = Config::profiles().await;
+    let profile_items = profile_items.latest_arc();
+    for item in profile_items.items.iter().flatten() {
+        let candidates = [
+            item.file.as_ref(),
+            item.option.as_ref().and_then(|option| option.rules.as_ref()),
+        ];
+        for uid in candidates.into_iter().flatten() {
+            let Some(content) = contents.get(uid.as_str()) else {
+                continue;
+            };
+            if !seen.insert(uid.clone().into()) {
+                continue;
+            }
+            rules.push(RuledBackupRule {
+                name: item.name.clone().unwrap_or_else(|| uid.clone()).into(),
+                content: content.clone().into(),
+            });
+        }
+    }
+
+    let zip_bytes = build_settings_zip(&settings)?;
     let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
-    encoder.write_all(&bytes)?;
+    encoder.write_all(&zip_bytes)?;
     let compressed = encoder.finish()?;
 
-    Ok(format!("{QUICK_CONFIG_PREFIX}{}", BASE64.encode(compressed)).into())
+    Ok(RuledBackupPayload {
+        settings: format!("{QUICK_CONFIG_PREFIX}{}", BASE64.encode(compressed)).into(),
+        rules,
+    })
+}
+
+/// Rebuild a stored-only zip from the entries that survive the settings filter.
+fn build_settings_zip(entries: &[(std::string::String, Vec<u8>)]) -> Result<Vec<u8>> {
+    let mut cursor = std::io::Cursor::new(Vec::new());
+    let mut writer = zip::ZipWriter::new(&mut cursor);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+    for (name, buffer) in entries {
+        writer.start_file(name.as_str(), options)?;
+        writer.write_all(buffer)?;
+    }
+    writer.finish()?;
+
+    Ok(cursor.into_inner())
 }
 
 /// Materialize a quick-config payload into the local backup directory.
@@ -318,7 +398,7 @@ pub async fn write_local_backup_base64(filename: String, content: String) -> Res
         .await
         .map_err(|err| anyhow!("Failed to import backup file: {err:#}"))?;
 
-    Ok(file_name)
+    Ok(file_name.to_string().into())
 }
 
 async fn move_file(from: PathBuf, to: PathBuf) -> Result<()> {

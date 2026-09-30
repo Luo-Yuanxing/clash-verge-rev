@@ -35,9 +35,9 @@ pub async fn export_local_backup(filename: String, destination: String) -> CmdRe
     feat::export_local_backup(filename, destination).await.stringify_err()
 }
 
-/// Read a local backup file as Base64, used by the quick-config export.
+/// Share payload of a local backup: settings without subscriptions plus every custom rule.
 #[tauri::command]
-pub async fn read_local_backup_base64(filename: String) -> CmdResult<String> {
+pub async fn read_local_backup_base64(filename: String) -> CmdResult<feat::RuledBackupPayload> {
     feat::read_local_backup_base64(filename).await.stringify_err()
 }
 
