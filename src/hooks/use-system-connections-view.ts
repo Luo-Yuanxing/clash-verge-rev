@@ -7,6 +7,6 @@ export const useSystemConnectionViews = (
   coreConnections: IConnectionsItem[],
 ) =>
   useMemo(
-    () => ({ connections: mapSystemConnections(items, coreConnections) }),
+    () => mapSystemConnections(items, coreConnections),
     [items, coreConnections],
   )

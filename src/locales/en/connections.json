@@ -14,7 +14,9 @@
       "source": "Source",
       "destination": "Destination",
       "destinationPort": "Destination Port",
-      "type": "Type"
+      "type": "Type",
+      "state": "State",
+      "pid": "Process ID"
     },
     "order": {
       "default": "Default",
@@ -33,6 +35,9 @@
     },
     "history": {
       "window": "{{count}} min"
+    },
+    "system": {
+      "noRemote": "None (listening)"
     },
     "columnManager": {
       "title": "Columns",

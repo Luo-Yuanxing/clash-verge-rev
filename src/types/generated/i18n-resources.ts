@@ -25,9 +25,11 @@ export interface TranslationResources {
           destinationPort: string
           dlSpeed: string
           host: string
+          pid: string
           process: string
           rule: string
           source: string
+          state: string
           time: string
           type: string
           ulSpeed: string
@@ -66,6 +68,9 @@ export interface TranslationResources {
           skipped: string
           summary: string
           title: string
+        }
+        system: {
+          noRemote: string
         }
       }
       page: {

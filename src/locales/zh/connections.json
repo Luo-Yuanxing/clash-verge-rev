@@ -14,7 +14,9 @@
       "source": "源地址",
       "destination": "目标地址",
       "destinationPort": "目标端口",
-      "type": "类型"
+      "type": "类型",
+      "state": "状态",
+      "pid": "进程 ID"
     },
     "order": {
       "default": "默认",
@@ -33,6 +35,9 @@
     },
     "history": {
       "window": "{{count}} 分钟"
+    },
+    "system": {
+      "noRemote": "无对端（监听）"
     },
     "columnManager": {
       "title": "列设置",

@@ -256,10 +256,14 @@ const ConnectionsPage = () => {
     (id: string) => {
       const connection = filterConn.find((item) => item.id === id)
       if (connection) {
-        detailRef.current?.open(connection, isConnectionClosed(id))
+        detailRef.current?.open(
+          connection,
+          isConnectionClosed(id),
+          systemViews.rowById.get(id),
+        )
       }
     },
-    [filterConn, isConnectionClosed],
+    [filterConn, isConnectionClosed, systemViews],
   )
 
   const onCloseAll = useLockFn(closeAllConnections)

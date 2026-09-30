@@ -42,26 +42,36 @@ const coreConnection = (
   rulePayload: '',
 })
 
+const mapOne = (
+  rows: ISystemConnectionsItem[],
+  cores: IConnectionsItem[] = [],
+) => mapSystemConnections(rows, cores).connections[0]
+
 describe('mapSystemConnections', () => {
   it('keeps rows without a core match as direct connections', () => {
-    const [row] = mapSystemConnections([systemRow()], [])
+    const row = mapOne([systemRow()])
     expect(row.chains).toEqual([])
     expect(row.rule).toBe('')
     expect(row.metadata.sourcePort).toBe('51000')
     expect(row.id).toContain('sys:tcp')
   })
 
+  it('reports the peer as the host and keeps the row addressable by id', () => {
+    const { connections, rowById } = mapSystemConnections([systemRow()], [])
+    const row = connections[0]
+    expect(row.metadata.host).toBe('1.1.1.1')
+    expect(row.metadata.destinationPort).toBe('443')
+    expect(rowById.get(row.id)?.pid).toBe(4242)
+  })
+
   it('marks a row as core-routed when the local ports agree', () => {
-    const [row] = mapSystemConnections([systemRow()], [coreConnection()])
+    const row = mapOne([systemRow()], [coreConnection()])
     expect(row.chains).toEqual(['CORE'])
     expect(row.rule).toBe('MATCH')
   })
 
   it('keeps rows with a mismatched local port direct', () => {
-    const [row] = mapSystemConnections(
-      [systemRow()],
-      [coreConnection({ sourcePort: '52000' })],
-    )
+    const row = mapOne([systemRow()], [coreConnection({ sourcePort: '52000' })])
     expect(row.chains).toEqual([])
   })
 
@@ -70,15 +80,12 @@ describe('mapSystemConnections', () => {
       sourcePort: '52000',
       process: 'mihomo.exe',
     })
-    const [row] = mapSystemConnections(
-      [systemRow({ process: 'mihomo.exe' })],
-      [core],
-    )
+    const row = mapOne([systemRow({ process: 'mihomo.exe' })], [core])
     expect(row.chains).toEqual(['CORE'])
   })
 
   it('treats connectionless UDP rows as direct without a destination', () => {
-    const [row] = mapSystemConnections(
+    const row = mapOne(
       [
         systemRow({
           protocol: 'udp',
@@ -91,6 +98,7 @@ describe('mapSystemConnections', () => {
     )
     expect(row.chains).toEqual([])
     expect(row.metadata.destinationPort).toBe('')
+    expect(row.metadata.host).toBe('')
     expect(row.metadata.process).toBe('4242')
   })
 })
