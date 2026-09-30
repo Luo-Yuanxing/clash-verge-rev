@@ -1,9 +1,13 @@
 import { CloseRounded } from '@mui/icons-material'
-import { Checkbox, IconButton } from '@mui/material'
+import { Checkbox, IconButton, Tooltip } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { useLockFn } from 'ahooks'
 import { memo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { closeConnection } from 'tauri-plugin-mihomo-api'
+
+import type { HostProbeState } from '@/hooks/use-host-probe'
+import { HOST_PROBE_WINDOW_MS } from '@/utils/connection-probe'
 
 import { RelativeTime } from './connection-relative-time'
 import type { ConnectionRowView } from './connection-row-view'
@@ -14,6 +18,8 @@ interface Props {
   onShowDetail: (id: string) => void
   selected: boolean
   onToggleSelect: (id: string) => void
+  /** 主动探测结果：未响应（连接失败或被墙）的主机标红 */
+  probeState?: HostProbeState
 }
 
 const tagStyle = {
@@ -78,6 +84,7 @@ export const ConnectionRowItem = memo(
     onShowDetail,
     selected,
     onToggleSelect,
+    probeState,
   }: Props) {
     const { t } = useTranslation()
     const onDelete = useLockFn(async () => closeConnection(row.id))
@@ -90,6 +97,8 @@ export const ConnectionRowItem = memo(
       [onToggleSelect, row.id],
     )
     const showTraffic = row.uploadSpeed >= 100 || row.downloadSpeed >= 100
+    const failed = probeState?.status === 'fail'
+    const errorColor = useTheme().palette.error.main
 
     return (
       <div style={itemStyle}>
@@ -100,7 +109,24 @@ export const ConnectionRowItem = memo(
           sx={{ flexShrink: 0, p: 0.5 }}
         />
         <div style={contentStyle} onClick={handleShowDetail}>
-          <div style={primaryStyle}>{row.host}</div>
+          <Tooltip
+            title={
+              failed
+                ? t('connections.components.probe.error', {
+                    seconds: HOST_PROBE_WINDOW_MS / 1000,
+                  })
+                : ''
+            }
+          >
+            <div
+              style={{
+                ...primaryStyle,
+                color: failed ? errorColor : undefined,
+              }}
+            >
+              {row.host}
+            </div>
+          </Tooltip>
           <div style={tagsStyle}>
             <span style={tagStyle}>{row.network}</span>
             <span style={tagStyle}>{row.type}</span>
@@ -136,5 +162,6 @@ export const ConnectionRowItem = memo(
     prev.closed === next.closed &&
     prev.onShowDetail === next.onShowDetail &&
     prev.selected === next.selected &&
-    prev.onToggleSelect === next.onToggleSelect,
+    prev.onToggleSelect === next.onToggleSelect &&
+    prev.probeState === next.probeState,
 )

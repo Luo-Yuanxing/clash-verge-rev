@@ -28,7 +28,12 @@
       "closeConnection": "Close Connection",
       "pause": "Pause refresh",
       "resume": "Resume refresh",
-      "createRule": "Create rules"
+      "createRule": "Create rules",
+      "probe": "Probe hosts",
+      "probing": "Probing…"
+    },
+    "probe": {
+      "error": "No response within {{seconds}}s: unreachable or blocked"
     },
     "history": {
       "window": "{{count}} min"

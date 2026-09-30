@@ -1,4 +1,4 @@
-import { Checkbox } from '@mui/material'
+import { Checkbox, Tooltip } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { useLocalStorage } from 'foxact/use-local-storage'
 import {
@@ -12,6 +12,9 @@ import {
   type UIEvent as ReactUIEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import type { HostProbeState } from '@/hooks/use-host-probe'
+import { HOST_PROBE_WINDOW_MS } from '@/utils/connection-probe'
 
 import {
   ConnectionColumnManager,
@@ -264,15 +267,44 @@ const compareConnectionCellValue = (
   return String(leftValue ?? '').localeCompare(String(rightValue ?? ''))
 }
 
+/** 主机行的探测键：与列里显示的内容一致 */
+const hostKeyOf = (snapshot: TableRowSnapshot) =>
+  snapshot.row.metadata.host.trim() ||
+  snapshot.row.metadata.destinationIP?.trim() ||
+  ''
+
 const renderCell = (
   column: DisplayColumn,
   row: IConnectionsItem,
   snapshot: TableRowSnapshot,
+  probeErrorColor: string,
+  hostProbeError: string,
+  getHostProbeState?: (host: string) => HostProbeState | undefined,
 ) => {
   if (column.cell) return column.cell(row, snapshot)
   if (column.field === 'time')
     return <RelativeTime start={snapshot.row.start} />
-  return getConnectionCellValue(column.field, snapshot)
+
+  const value = getConnectionCellValue(column.field, snapshot)
+  if (column.field !== 'host' || !getHostProbeState) return value
+
+  const state = getHostProbeState(hostKeyOf(snapshot))
+  // 探测不到回应（连接失败或被墙）的主机标红，并在悬浮时说明原因
+  if (state?.status !== 'fail') return value
+
+  return (
+    <Tooltip title={hostProbeError}>
+      <span
+        style={{
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          color: probeErrorColor,
+        }}
+      >
+        {value}
+      </span>
+    </Tooltip>
+  )
 }
 
 const selectCellStyle = {
@@ -288,6 +320,9 @@ interface RowComponentProps {
   columns: DisplayColumn[]
   onShowDetail: (id: string) => void
   getSnapshot: (row: IConnectionsItem) => TableRowSnapshot
+  getHostProbeState: (host: string) => HostProbeState | undefined
+  hostProbeError: string
+  probeErrorColor: string
   borderColor: string
   virtualTop: number
   selected: boolean
@@ -300,6 +335,9 @@ const RowComponent = memo(
     columns,
     onShowDetail,
     getSnapshot,
+    getHostProbeState,
+    hostProbeError,
+    probeErrorColor,
     borderColor,
     virtualTop,
     selected,
@@ -359,7 +397,14 @@ const RowComponent = memo(
               textOverflow: 'ellipsis',
             }}
           >
-            {renderCell(column, row, snapshot)}
+            {renderCell(
+              column,
+              row,
+              snapshot,
+              probeErrorColor,
+              hostProbeError,
+              getHostProbeState,
+            )}
           </div>
         ))}
       </div>
@@ -371,6 +416,9 @@ const RowComponent = memo(
     prev.virtualTop === next.virtualTop &&
     prev.onShowDetail === next.onShowDetail &&
     prev.getSnapshot === next.getSnapshot &&
+    prev.getHostProbeState === next.getHostProbeState &&
+    prev.hostProbeError === next.hostProbeError &&
+    prev.probeErrorColor === next.probeErrorColor &&
     prev.borderColor === next.borderColor &&
     prev.selected === next.selected &&
     prev.onToggleSelect === next.onToggleSelect,
@@ -384,6 +432,8 @@ interface Props {
   selectedIds: ReadonlySet<string>
   onToggleSelect: (id: string) => void
   onToggleSelectAll: (ids: string[]) => void
+  /** 主动探测结果：未响应（连接失败或被墙）的主机标红 */
+  getHostProbeState: (host: string) => HostProbeState | undefined
   /** 历史列表按域名聚合，主机列只显示域名，不带目标端口 */
   hostWithoutPort?: boolean
 }
@@ -397,6 +447,7 @@ export const ConnectionTable = (props: Props) => {
     selectedIds,
     onToggleSelect,
     onToggleSelectAll,
+    getHostProbeState,
     hostWithoutPort = false,
   } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
@@ -407,6 +458,9 @@ export const ConnectionTable = (props: Props) => {
   )
   const { t } = useTranslation()
   const theme = useTheme()
+  const hostProbeError = t('connections.components.probe.error', {
+    seconds: HOST_PROBE_WINDOW_MS / 1000,
+  })
 
   const [columnVisibilityModel, setColumnVisibilityModel] =
     useLocalStorage<VisibilityState>(
@@ -962,6 +1016,9 @@ export const ConnectionTable = (props: Props) => {
                       columns={visibleColumns}
                       onShowDetail={onShowDetail}
                       getSnapshot={getRowSnapshot}
+                      getHostProbeState={getHostProbeState}
+                      hostProbeError={hostProbeError}
+                      probeErrorColor={theme.palette.error.main}
                       borderColor={borderColor}
                       virtualTop={index * ROW_HEIGHT}
                       selected={selectedIds.has(row.id)}

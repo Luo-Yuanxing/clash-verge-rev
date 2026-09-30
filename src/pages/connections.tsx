@@ -1,6 +1,7 @@
 import {
   DeleteForeverRounded,
   FilterAltRounded,
+  NetworkCheckRounded,
   PauseRounded,
   PlayArrowRounded,
   RuleRounded,
@@ -55,8 +56,10 @@ import {
   useConnectionSetting,
 } from '@/hooks/use-connection-setting'
 import { useCustomRuleCoverage } from '@/hooks/use-custom-rule-coverage'
+import { useHostProbe } from '@/hooks/use-host-probe'
 import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVisibility } from '@/hooks/use-visibility'
+import { type HostProbeTarget, probeUrlOf } from '@/utils/connection-probe'
 import { isIpAddress } from '@/utils/network'
 import parseTraffic from '@/utils/parse-traffic'
 
@@ -106,6 +109,13 @@ const isIpConnection = (connection: IConnectionsItem) => {
     host.trim() || destinationIP?.trim() || remoteDestination?.trim() || ''
   return Boolean(target) && isIpAddress(target)
 }
+
+/** 探测键与列表里显示的主机一致：优先主机名，其次目标 IP */
+const hostKeyOfConnection = (connection: IConnectionsItem) =>
+  connection.metadata.host.trim() ||
+  connection.metadata.destinationIP?.trim() ||
+  ''
+
 const ConnectionsPage = () => {
   const { t } = useTranslation()
   const pageVisible = useVisibility()
@@ -251,6 +261,38 @@ const ConnectionsPage = () => {
     isTableLayout ? EMPTY_CONNECTIONS : filterConn,
     { hostWithoutPort: connectionsType === 'history' },
   )
+
+  const { states: hostProbeStates, run: runHostProbe } = useHostProbe()
+
+  const probeTargets = useMemo(() => {
+    const targets = new Map<string, HostProbeTarget>()
+    for (const connection of filterConn) {
+      const host = hostKeyOfConnection(connection)
+      if (!host || targets.has(host)) continue
+      const url = probeUrlOf(
+        host,
+        connection.metadata.network,
+        connection.metadata.destinationPort,
+      )
+      if (url) targets.set(host, { host, url })
+    }
+    return [...targets.values()]
+  }, [filterConn])
+
+  const getHostProbeState = useCallback(
+    (host: string) => hostProbeStates.get(host.trim().toLowerCase()),
+    [hostProbeStates],
+  )
+
+  const runProbe = useLockFn(() => runHostProbe(probeTargets))
+
+  const probingCount = useMemo(() => {
+    let count = 0
+    for (const target of probeTargets) {
+      if (getHostProbeState(target.host)?.status === 'probing') count += 1
+    }
+    return count
+  }, [getHostProbeState, probeTargets])
 
   const detailRef = useRef<ConnectionDetailRef>(null!)
 
@@ -466,6 +508,27 @@ const ConnectionsPage = () => {
             </IconButton>
           </Tooltip>
         )}
+        <Tooltip
+          title={t(
+            probingCount > 0
+              ? 'connections.components.actions.probing'
+              : 'connections.components.actions.probe',
+          )}
+        >
+          <span style={{ flex: '0 0 auto' }}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<NetworkCheckRounded fontSize="small" />}
+              disabled={probeTargets.length === 0}
+              loading={probingCount > 0}
+              onClick={() => void runProbe()}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              {t('connections.components.actions.probe')}
+            </Button>
+          </span>
+        </Tooltip>
         {!isTableLayout && (
           <BaseStyledSelect
             value={curOrderOpt}
@@ -551,6 +614,7 @@ const ConnectionsPage = () => {
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
+          getHostProbeState={getHostProbeState}
           hostWithoutPort={connectionsType === 'history'}
         />
       ) : (
@@ -565,6 +629,11 @@ const ConnectionsPage = () => {
               onShowDetail={showDetailById}
               selected={selectedIds.has(displayRows[i]?.id ?? '')}
               onToggleSelect={toggleSelect}
+              probeState={getHostProbeState(
+                displayRows[i]?.searchableHost ??
+                  displayRows[i]?.searchableDestinationIP ??
+                  '',
+              )}
             />
           )}
           style={{

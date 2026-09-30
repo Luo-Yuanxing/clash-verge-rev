@@ -12,6 +12,8 @@ export interface TranslationResources {
           createRule: string
           history: string
           pause: string
+          probe: string
+          probing: string
           resume: string
         }
         columnManager: {
@@ -43,6 +45,9 @@ export interface TranslationResources {
           default: string
           downloadSpeed: string
           uploadSpeed: string
+        }
+        probe: {
+          error: string
         }
         ruleDialog: {
           actions: {
