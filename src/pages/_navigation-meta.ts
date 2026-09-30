@@ -8,6 +8,10 @@ export const navigationItems = {
     label: 'layout.components.navigation.tabs.profiles',
     path: '/profile',
   },
+  customRules: {
+    label: 'layout.components.navigation.tabs.customRules',
+    path: '/custom-rules',
+  },
   connections: {
     label: 'layout.components.navigation.tabs.connections',
     path: '/connections',

@@ -1,3 +1,4 @@
+import AltRouteOutlinedIcon from '@mui/icons-material/AltRouteOutlined'
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined'
 import ForkRightOutlinedIcon from '@mui/icons-material/ForkRightOutlined'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
@@ -9,6 +10,7 @@ import WifiOutlinedIcon from '@mui/icons-material/WifiOutlined'
 import { type ComponentType, type ReactNode } from 'react'
 
 import ConnectionsSvg from '@/assets/image/itemicon/connections.svg?react'
+import CustomRulesSvg from '@/assets/image/itemicon/custom-rules.svg?react'
 import HomeSvg from '@/assets/image/itemicon/home.svg?react'
 import LogsSvg from '@/assets/image/itemicon/logs.svg?react'
 import ProfilesSvg from '@/assets/image/itemicon/profiles.svg?react'
@@ -19,6 +21,7 @@ import UnlockSvg from '@/assets/image/itemicon/unlock.svg?react'
 
 import { navigationItems } from './_navigation-meta'
 import ConnectionsPage from './connections'
+import CustomRulesPage from './custom-rules'
 import HomePage from './home'
 import LogsPage from './logs'
 import ProfilePage from './profiles'
@@ -49,6 +52,11 @@ export const navItems: NavigationItem[] = [
     ...navigationItems.profiles,
     icon: [<DnsOutlinedIcon key="mui" />, <ProfilesSvg key="svg" />],
     Component: ProfilePage,
+  },
+  {
+    ...navigationItems.customRules,
+    icon: [<AltRouteOutlinedIcon key="mui" />, <CustomRulesSvg key="svg" />],
+    Component: CustomRulesPage,
   },
   {
     ...navigationItems.connections,
