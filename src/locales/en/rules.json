@@ -1,4 +1,9 @@
 {
+  "custom": {
+    "page": {
+      "title": "Custom Rules"
+    }
+  },
   "page": {
     "provider": {
       "trigger": "Rule Provider",

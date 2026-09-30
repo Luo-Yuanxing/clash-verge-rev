@@ -1,4 +1,9 @@
 {
+  "custom": {
+    "page": {
+      "title": "自定义规则"
+    }
+  },
   "page": {
     "provider": {
       "trigger": "规则集合",

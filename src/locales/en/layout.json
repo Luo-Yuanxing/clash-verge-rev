@@ -5,6 +5,7 @@
         "home": "Home",
         "proxies": "Proxies",
         "profiles": "Profiles",
+        "customRules": "Custom Rules",
         "connections": "Connections",
         "rules": "Rules",
         "logs": "Logs",

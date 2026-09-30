@@ -206,6 +206,7 @@ export interface TranslationResources {
           }
           tabs: {
             connections: string
+            customRules: string
             home: string
             logs: string
             profiles: string
@@ -606,6 +607,11 @@ export interface TranslationResources {
       }
     }
     rules: {
+      custom: {
+        page: {
+          title: string
+        }
+      }
       feedback: {
         notifications: {
           provider: {
