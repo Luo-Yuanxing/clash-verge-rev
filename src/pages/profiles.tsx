@@ -891,13 +891,11 @@ const ProfilePage = () => {
         </Button>
       </Stack>
 
-      <QuickConfigBar />
-
       <Box
         sx={{
           pl: '10px',
           pr: '10px',
-          height: 'calc(100% - 100px)',
+          height: 'calc(100% - 48px)',
           overflowY: 'auto',
         }}
       >
@@ -983,6 +981,8 @@ const ProfilePage = () => {
             </Grid>
           </Grid>
         </Box>
+
+        <QuickConfigBar />
       </Box>
 
       <ProfileViewer

@@ -5,6 +5,7 @@ import {
   UploadRounded,
 } from '@mui/icons-material'
 import {
+  Box,
   Button,
   Divider,
   IconButton,
@@ -33,8 +34,8 @@ const ERROR_KEYS = {
 } as const
 
 const TOGGLE_SX = {
-  px: 1.25,
-  py: 0.25,
+  px: 1.5,
+  py: 0.5,
   whiteSpace: 'nowrap',
   textTransform: 'none',
 } as const
@@ -97,49 +98,72 @@ export const QuickConfigBar = () => {
 
   return (
     <>
-      <Divider variant="middle" sx={{ mx: '10px' }} />
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{
-          pt: 1,
-          mb: 0.5,
-          mx: '10px',
-          height: '36px',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <ToggleButtonGroup
-          size="small"
-          exclusive
-          value={scope}
-          onChange={(_, next: QuickConfigScope | null) => {
-            if (next) setScope(next)
-          }}
-          sx={{ flexShrink: 0 }}
-        >
-          <ToggleButton
-            value="all"
-            title={t('profiles.page.quickConfig.scope.allHint')}
-            sx={TOGGLE_SX}
+      <Divider
+        variant="middle"
+        sx={{ width: 'calc(100% - 32px)', mx: 'auto', mt: 0.5 }}
+      />
+      <Stack spacing={1} sx={{ pt: 1, mb: 1.5, mx: '4px' }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <ToggleButtonGroup
+            exclusive
+            value={scope}
+            onChange={(_, next: QuickConfigScope | null) => {
+              if (next) setScope(next)
+            }}
+            sx={{ flexShrink: 0 }}
           >
-            {t('profiles.page.quickConfig.scope.all')}
-          </ToggleButton>
-          <ToggleButton
-            value="just-rule"
-            title={t('profiles.page.quickConfig.scope.justRuleHint')}
-            sx={TOGGLE_SX}
+            <ToggleButton
+              value="all"
+              title={t('profiles.page.quickConfig.scope.allHint')}
+              sx={TOGGLE_SX}
+            >
+              {t('profiles.page.quickConfig.scope.all')}
+            </ToggleButton>
+            <ToggleButton
+              value="just-rule"
+              title={t('profiles.page.quickConfig.scope.justRuleHint')}
+              sx={TOGGLE_SX}
+            >
+              {t('profiles.page.quickConfig.scope.justRule')}
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          <Box sx={{ flex: 1 }} />
+
+          <Button
+            variant="outlined"
+            loading={busy}
+            startIcon={<DownloadRounded />}
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap', borderRadius: '6px' }}
+            onClick={() => {
+              void onExport()
+            }}
           >
-            {t('profiles.page.quickConfig.scope.justRule')}
-          </ToggleButton>
-        </ToggleButtonGroup>
+            {t('profiles.page.quickConfig.export')}
+          </Button>
+
+          <Button
+            variant="contained"
+            disabled={!text || busy}
+            startIcon={<UploadRounded />}
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap', borderRadius: '6px' }}
+            onClick={() => {
+              void onImport()
+            }}
+          >
+            {t('profiles.page.quickConfig.import')}
+          </Button>
+        </Stack>
 
         <BaseStyledTextField
           value={text}
           variant="outlined"
           onChange={(event) => setText(event.target.value)}
           placeholder={t('profiles.page.quickConfig.placeholder')}
+          sx={{
+            '& .MuiInputBase-root': { height: 50 },
+            input: { py: 0.65, px: 1.25 },
+          }}
           slotProps={{
             input: {
               sx: { fontFamily: 'monospace', fontSize: 12, pr: 1 },
@@ -167,32 +191,6 @@ export const QuickConfigBar = () => {
             },
           }}
         />
-
-        <Button
-          size="small"
-          variant="outlined"
-          loading={busy}
-          startIcon={<DownloadRounded />}
-          sx={{ flexShrink: 0, whiteSpace: 'nowrap', borderRadius: '6px' }}
-          onClick={() => {
-            void onExport()
-          }}
-        >
-          {t('profiles.page.quickConfig.export')}
-        </Button>
-
-        <Button
-          size="small"
-          variant="contained"
-          disabled={!text || busy}
-          startIcon={<UploadRounded />}
-          sx={{ flexShrink: 0, whiteSpace: 'nowrap', borderRadius: '6px' }}
-          onClick={() => {
-            void onImport()
-          }}
-        >
-          {t('profiles.page.quickConfig.import')}
-        </Button>
       </Stack>
     </>
   )
