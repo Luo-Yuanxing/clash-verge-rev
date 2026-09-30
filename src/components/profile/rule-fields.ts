@@ -87,6 +87,55 @@ export const compareRulesByHostLevel = (
   return keyA.localeCompare(keyB)
 }
 
+/** 常见多级公共后缀，命中时 DOMAIN-SUFFIX 保留三级而不是两级 */
+const MULTI_LEVEL_SUFFIXES = new Set([
+  'com.cn',
+  'net.cn',
+  'org.cn',
+  'gov.cn',
+  'edu.cn',
+  'ac.cn',
+  'co.uk',
+  'org.uk',
+  'ac.uk',
+  'gov.uk',
+  'co.jp',
+  'co.kr',
+  'co.in',
+  'com.tw',
+  'com.hk',
+  'com.au',
+  'com.sg',
+  'com.br',
+  'com.mx',
+  'com.tr',
+  'com.my',
+  'com.ph',
+  'com.vn',
+  'com.id',
+])
+
+const IPV4_REGEX = /^\d{1,3}(\.\d{1,3}){3}$/
+
+/**
+ * 归一化 DOMAIN-SUFFIX 的条件部分：只保留最后两级域名，
+ * 例如 `www.twitter.com` → `twitter.com`、`api.x.com` → `x.com`；
+ * 多级公共后缀保留三级（`a.b.com.cn` → `b.com.cn`）；IP 与空值原样返回。
+ */
+export const normalizeDomainSuffix = (value: string): string => {
+  const host = value
+    .trim()
+    .toLowerCase()
+    .replace(/^\.+|\.+$/g, '')
+  if (!host || host.includes(':') || IPV4_REGEX.test(host)) return value
+
+  const labels = host.split('.').filter(Boolean)
+  if (labels.length <= 2) return labels.join('.')
+
+  const keep = MULTI_LEVEL_SUFFIXES.has(labels.slice(-2).join('.')) ? 3 : 2
+  return labels.slice(-keep).join('.')
+}
+
 /** 把 from 位置的元素移动到 to 位置，返回新数组 */
 export const moveItem = <T>(list: T[], from: number, to: number): T[] => {
   if (from === to || from < 0 || from >= list.length) return list
