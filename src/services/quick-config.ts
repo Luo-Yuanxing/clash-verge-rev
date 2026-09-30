@@ -2,6 +2,12 @@ import dayjs from 'dayjs'
 import * as yaml from 'js-yaml'
 
 import {
+  hasSeqRules,
+  mergeSeqRules,
+  serializeSeqRules,
+  toSeqConfig,
+} from '@/components/profile/seq-rules-document'
+import {
   createLocalBackup,
   createProfile,
   getProfiles,
@@ -290,8 +296,14 @@ const uniqueBackupFileName = (existing: Set<string>): string => {
   return name
 }
 
-/** 新建一个空订阅，名字重名时在末尾补 `*`，返回最终订阅名 */
-const createEmptyProfile = async (nameBase: string): Promise<string> => {
+/**
+ * 新建一个空订阅并把规则内容写进它的规则文件（内容为空时只建订阅），返回订阅名。
+ * 名字重名时在末尾补 `*`。
+ */
+const createRulesProfile = async (
+  nameBase: string,
+  content: string | null,
+): Promise<string> => {
   const profiles = await getProfiles()
   const name = uniqueProfileName(profiles.items ?? [], nameBase)
 
@@ -301,12 +313,39 @@ const createEmptyProfile = async (nameBase: string): Promise<string> => {
     throw new QuickConfigError('profile')
   }
 
+  if (!content) return name
+
+  const created = (await getProfiles()).items?.find(
+    (item) => item?.name === name,
+  )
+  const rulesUid = created?.option?.rules
+  if (!rulesUid) throw new QuickConfigError('rules')
+
+  const outcome = await saveRulesFile(rulesUid, content)
+  if (outcome.status !== 'valid') throw new QuickConfigError('rules')
+
   return name
 }
 
 /**
- * 导入配置：`cv1:` 备份载荷恢复设置，再新建一个空订阅——载荷里的规则字符串不导入，
- * 订阅名统一取载荷前八位；旧的 JSON 快捷配置则把自带的一份规则挂到新建的空订阅上。
+ * 载荷里各订阅的规则合并成一份规则文件，保留「完全排除订阅规则」等设置；
+ * 内容全空时返回 null，只建空订阅。
+ */
+const mergeBackupRules = (
+  rules: RuledBackupPayload['rules'],
+): string | null => {
+  const merged = mergeSeqRules(
+    rules.map((entry) =>
+      toSeqConfig(parseYamlSafe(entry.content) as ISeqProfileConfig | null),
+    ),
+  )
+
+  return hasSeqRules(merged) ? serializeSeqRules(merged) : null
+}
+
+/**
+ * 导入配置：`cv1:` 备份载荷恢复设置，再把各订阅的规则合并后挂到新建的订阅上——
+ * 订阅名统一取载荷前八位；旧的 JSON 快捷配置则把自带的一份规则挂到新建的订阅上。
  * `scope` 为界面当前选中的范围，载荷范围与之不符时直接拒绝。
  */
 export const importQuickConfig = async (
@@ -336,7 +375,12 @@ export const importQuickConfig = async (
       throw new QuickConfigError('restore')
     }
 
-    return { name: await createEmptyProfile(nameBase), backupFile }
+    const name = await createRulesProfile(
+      nameBase,
+      mergeBackupRules(payload.rules),
+    )
+
+    return { name, backupFile }
   }
 
   const payload = parseQuickConfig(text)
@@ -347,18 +391,10 @@ export const importQuickConfig = async (
     return { name: null, backupFile: null }
   }
 
-  const name = await createEmptyProfile(nameBase)
-  const created = (await getProfiles()).items?.find(
-    (item) => item?.name === name,
-  )
-  const rulesUid = created?.option?.rules
-  if (!rulesUid) throw new QuickConfigError('rules')
-
-  const outcome = await saveRulesFile(
-    rulesUid,
+  const name = await createRulesProfile(
+    nameBase,
     yaml.dump(customRule, { forceQuotes: true }),
   )
-  if (outcome.status !== 'valid') throw new QuickConfigError('rules')
 
   return { name, backupFile: null }
 }

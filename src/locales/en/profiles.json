@@ -28,7 +28,7 @@
     "quickConfig": {
       "scope": {
         "all": "All",
-        "allHint": "Export app settings and every subscription's custom rules (without the subscriptions); importing attaches them to new profiles",
+        "allHint": "Export app settings and every subscription's custom rules (without the subscriptions); importing merges them into a new profile",
         "justRule": "Rules only",
         "justRuleHint": "Export only the custom rules of the active profile"
       },
@@ -38,7 +38,7 @@
       "feedback": {
         "exported": "Generated and copied to clipboard",
         "imported": "Import finished, new profile: {{name}}",
-        "importedBackup": "Settings imported and an empty profile created: {{name}}",
+        "importedBackup": "Settings imported and a new profile created: {{name}}",
         "badFormat": "Invalid string format: not a valid Base64 or backup payload",
         "badJson": "Invalid string format: the content is not valid JSON",
         "badType": "Type mismatch: not a quick config exported by this app",

@@ -62,6 +62,39 @@ export const emptySeqRulesConfig = (): SeqRulesConfig => ({
   excludeSubscriptionRules: false,
 })
 
+/** 有没有实质内容：四个序列都空且没开启「完全排除订阅规则」时视为空 */
+export const hasSeqRules = (config: SeqRulesConfig): boolean =>
+  config.prepend.length > 0 ||
+  config.append.length > 0 ||
+  config.delete.length > 0 ||
+  config.disabled.prepend.length > 0 ||
+  config.disabled.append.length > 0 ||
+  config.excludeSubscriptionRules
+
+/**
+ * 合并多份规则配置：同名规则只保留第一次出现，「完全排除订阅规则」只要有任意一份开启就开启。
+ */
+export const mergeSeqRules = (configs: SeqRulesConfig[]): SeqRulesConfig => {
+  const merged = emptySeqRulesConfig()
+
+  const push = (target: string[], source: string[]) => {
+    for (const rule of source) {
+      if (!target.includes(rule)) target.push(rule)
+    }
+  }
+
+  for (const config of configs) {
+    push(merged.prepend, config.prepend)
+    push(merged.append, config.append)
+    push(merged.delete, config.delete)
+    push(merged.disabled.prepend, config.disabled.prepend)
+    push(merged.disabled.append, config.disabled.append)
+    merged.excludeSubscriptionRules ||= config.excludeSubscriptionRules
+  }
+
+  return merged
+}
+
 /** 序列化 Rules 配置文件，与可视化编辑器保持一致 */
 export const serializeSeqRules = (config: SeqRulesConfig): string => {
   const { disabled } = config
