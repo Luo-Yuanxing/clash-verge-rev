@@ -23,6 +23,7 @@ import {
   formatConnectionTraffic,
   getConnectionDestination,
   getConnectionHost,
+  getConnectionHostName,
   getConnectionProcess,
   getConnectionRule,
   getConnectionSource,
@@ -89,6 +90,8 @@ interface SortingState {
 
 interface TableRowSnapshot {
   row: IConnectionsItem
+  /** 生成该快照时是否隐藏主机端口，用于切换视图时重建 */
+  hostWithoutPort: boolean
   host: string
   process: string
   source: string
@@ -148,13 +151,18 @@ const sameTrafficConnection = (
 
 const createTableRowSnapshot = (
   row: IConnectionsItem,
+  hostWithoutPort: boolean,
   previous?: TableRowSnapshot,
 ) => {
-  const previousRow = previous?.row
+  const reusable =
+    previous && previous.hostWithoutPort === hostWithoutPort
+      ? previous
+      : undefined
+  const previousRow = reusable?.row
   const sameStatic = previousRow && sameStaticConnection(previousRow, row)
   const sameTraffic = previousRow && sameTrafficConnection(previousRow, row)
 
-  if (sameStatic && sameTraffic && previous) return previous
+  if (sameStatic && sameTraffic && reusable) return reusable
 
   const upload = row.upload ?? 0
   const download = row.download ?? 0
@@ -163,39 +171,45 @@ const createTableRowSnapshot = (
 
   return {
     row,
-    host: sameStatic && previous ? previous.host : getConnectionHost(row),
+    hostWithoutPort,
+    host:
+      sameStatic && reusable
+        ? reusable.host
+        : hostWithoutPort
+          ? getConnectionHostName(row)
+          : getConnectionHost(row),
     process:
-      sameStatic && previous ? previous.process : getConnectionProcess(row),
-    source: sameStatic && previous ? previous.source : getConnectionSource(row),
+      sameStatic && reusable ? reusable.process : getConnectionProcess(row),
+    source: sameStatic && reusable ? reusable.source : getConnectionSource(row),
     destination:
-      sameStatic && previous
-        ? previous.destination
+      sameStatic && reusable
+        ? reusable.destination
         : getConnectionDestination(row),
     chainsText:
-      sameStatic && previous
-        ? previous.chainsText
+      sameStatic && reusable
+        ? reusable.chainsText
         : formatConnectionChains(row.chains),
     ruleText:
-      sameStatic && previous ? previous.ruleText : getConnectionRule(row),
+      sameStatic && reusable ? reusable.ruleText : getConnectionRule(row),
     typeLabel:
-      sameStatic && previous ? previous.typeLabel : getConnectionTypeLabel(row),
+      sameStatic && reusable ? reusable.typeLabel : getConnectionTypeLabel(row),
     startTime:
-      sameStatic && previous ? previous.startTime : getConnectionStartTime(row),
+      sameStatic && reusable ? reusable.startTime : getConnectionStartTime(row),
     uploadText:
-      sameTraffic && previous
-        ? previous.uploadText
+      sameTraffic && reusable
+        ? reusable.uploadText
         : formatConnectionTraffic(upload),
     downloadText:
-      sameTraffic && previous
-        ? previous.downloadText
+      sameTraffic && reusable
+        ? reusable.downloadText
         : formatConnectionTraffic(download),
     uploadSpeedText:
-      sameTraffic && previous
-        ? previous.uploadSpeedText
+      sameTraffic && reusable
+        ? reusable.uploadSpeedText
         : `${formatConnectionTraffic(curUpload)}/s`,
     downloadSpeedText:
-      sameTraffic && previous
-        ? previous.downloadSpeedText
+      sameTraffic && reusable
+        ? reusable.downloadSpeedText
         : `${formatConnectionTraffic(curDownload)}/s`,
   }
 }
@@ -370,6 +384,8 @@ interface Props {
   selectedIds: ReadonlySet<string>
   onToggleSelect: (id: string) => void
   onToggleSelectAll: (ids: string[]) => void
+  /** 历史列表按域名聚合，主机列只显示域名，不带目标端口 */
+  hostWithoutPort?: boolean
 }
 
 export const ConnectionTable = (props: Props) => {
@@ -381,6 +397,7 @@ export const ConnectionTable = (props: Props) => {
     selectedIds,
     onToggleSelect,
     onToggleSelectAll,
+    hostWithoutPort = false,
   } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
@@ -535,16 +552,23 @@ export const ConnectionTable = (props: Props) => {
   }, [baseColumns, setColumnOrder])
 
   const rowSnapshotCacheRef = useRef(new Map<string, TableRowSnapshot>())
-  const getRowSnapshot = useCallback((row: IConnectionsItem) => {
-    const cache = rowSnapshotCacheRef.current
-    const snapshot = createTableRowSnapshot(row, cache.get(row.id))
-    cache.set(row.id, snapshot)
-    if (cache.size > MAX_ROW_SNAPSHOT_CACHE_SIZE) {
-      const oldestKey = cache.keys().next().value
-      if (oldestKey && oldestKey !== row.id) cache.delete(oldestKey)
-    }
-    return snapshot
-  }, [])
+  const getRowSnapshot = useCallback(
+    (row: IConnectionsItem) => {
+      const cache = rowSnapshotCacheRef.current
+      const snapshot = createTableRowSnapshot(
+        row,
+        hostWithoutPort,
+        cache.get(row.id),
+      )
+      cache.set(row.id, snapshot)
+      if (cache.size > MAX_ROW_SNAPSHOT_CACHE_SIZE) {
+        const oldestKey = cache.keys().next().value
+        if (oldestKey && oldestKey !== row.id) cache.delete(oldestKey)
+      }
+      return snapshot
+    },
+    [hostWithoutPort],
+  )
 
   const orderedColumns = useMemo(() => {
     const baseFields = baseColumns.map((column) => column.field)

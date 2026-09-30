@@ -115,7 +115,7 @@ const ConnectionsPage = () => {
   const [hasSearch, setHasSearch] = useState(false)
   const [curOrderOpt, setCurOrderOpt] = useState<OrderKey>('default')
   const [connectionsType, setConnectionsType] =
-    useState<ConnectionsType>('active')
+    useState<ConnectionsType>('history')
 
   const {
     response: { data: connections },
@@ -251,6 +251,7 @@ const ConnectionsPage = () => {
 
   const displayRows = useConnectionRowViews(
     isTableLayout ? EMPTY_CONNECTIONS : filterConn,
+    { hostWithoutPort: connectionsType === 'history' },
   )
 
   const detailRef = useRef<ConnectionDetailRef>(null!)
@@ -406,6 +407,14 @@ const ConnectionsPage = () => {
         <ButtonGroup sx={{ mr: 1, flexBasis: 'content' }}>
           <Button
             size="small"
+            variant={connectionsType === 'history' ? 'contained' : 'outlined'}
+            onClick={() => selectConnectionsType('history')}
+          >
+            {t('connections.components.actions.history')}{' '}
+            {viewConnections.historyConnections.length}
+          </Button>
+          <Button
+            size="small"
             variant={connectionsType === 'active' ? 'contained' : 'outlined'}
             onClick={() => selectConnectionsType('active')}
           >
@@ -419,14 +428,6 @@ const ConnectionsPage = () => {
           >
             {t('connections.components.actions.closed')}{' '}
             {viewConnections.closedConnections.length}
-          </Button>
-          <Button
-            size="small"
-            variant={connectionsType === 'history' ? 'contained' : 'outlined'}
-            onClick={() => selectConnectionsType('history')}
-          >
-            {t('connections.components.actions.history')}{' '}
-            {viewConnections.historyConnections.length}
           </Button>
         </ButtonGroup>
         {connectionsType === 'history' && (
@@ -552,6 +553,7 @@ const ConnectionsPage = () => {
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
+          hostWithoutPort={connectionsType === 'history'}
         />
       ) : (
         <VirtualList

@@ -62,6 +62,14 @@ export const getConnectionHost = (connection: IConnectionsItem) => {
   return `${host}:${metadata.destinationPort}`
 }
 
+/** 只取主机名本身，不带目标端口，例如 example.com */
+export const getConnectionHostName = (connection: IConnectionsItem) => {
+  const { metadata } = connection
+  return (
+    metadata.host || metadata.destinationIP || metadata.remoteDestination || ''
+  )
+}
+
 export const getConnectionProcess = (connection: IConnectionsItem) => {
   const { metadata } = connection
   return metadata.process || metadata.processPath || ''
@@ -85,13 +93,18 @@ export const getConnectionTypeLabel = (connection: IConnectionsItem) => {
 export const getConnectionStartTime = (connection: IConnectionsItem) =>
   Date.parse(connection.start || '') || 0
 
-const createConnectionRowView = (connection: IConnectionsItem) => {
+const createConnectionRowView = (
+  connection: IConnectionsItem,
+  options?: ConnectionRowViewOptions,
+) => {
   const uploadSpeed = connection.curUpload ?? 0
   const downloadSpeed = connection.curDownload ?? 0
 
   return {
     id: connection.id,
-    host: getConnectionHost(connection),
+    host: options?.hostWithoutPort
+      ? getConnectionHostName(connection)
+      : getConnectionHost(connection),
     process: getConnectionProcess(connection),
     network: connection.metadata.network,
     type: connection.metadata.type,
@@ -140,13 +153,30 @@ const sameConnectionRowView = (
   left.searchableDestinationIP === right.searchableDestinationIP &&
   left.searchableProcess === right.searchableProcess
 
-export const useConnectionRowViews = (connections: IConnectionsItem[]) => {
+export interface ConnectionRowViewOptions {
+  /** 主机名不拼目标端口，历史列表按域名聚合时使用 */
+  hostWithoutPort?: boolean
+}
+
+export const useConnectionRowViews = (
+  connections: IConnectionsItem[],
+  options?: ConnectionRowViewOptions,
+) => {
+  const hostWithoutPort = options?.hostWithoutPort ?? false
   const previousRowsRef = useRef(new Map<string, ConnectionRowView>())
   const previousConnectionsRef = useRef(new Map<string, IConnectionsItem>())
+  const previousHostWithoutPortRef = useRef(hostWithoutPort)
 
   return useMemo(() => {
-    const previousRows = previousRowsRef.current
-    const previousConnections = previousConnectionsRef.current
+    const cacheValid = previousHostWithoutPortRef.current === hostWithoutPort
+    previousHostWithoutPortRef.current = hostWithoutPort
+
+    const previousRows = cacheValid
+      ? previousRowsRef.current
+      : new Map<string, ConnectionRowView>()
+    const previousConnections = cacheValid
+      ? previousConnectionsRef.current
+      : new Map<string, IConnectionsItem>()
     const nextRows = new Map<string, ConnectionRowView>()
     const nextConnections = new Map<string, IConnectionsItem>()
     const rows: ConnectionRowView[] = []
@@ -161,7 +191,7 @@ export const useConnectionRowViews = (connections: IConnectionsItem[]) => {
       if (previousRow && previousConnection === connection) {
         row = previousRow
       } else {
-        const nextRow = createConnectionRowView(connection)
+        const nextRow = createConnectionRowView(connection, { hostWithoutPort })
         row =
           previousRow && sameConnectionRowView(previousRow, nextRow)
             ? previousRow
@@ -175,5 +205,5 @@ export const useConnectionRowViews = (connections: IConnectionsItem[]) => {
     previousRowsRef.current = nextRows
     previousConnectionsRef.current = nextConnections
     return rows
-  }, [connections])
+  }, [connections, hostWithoutPort])
 }
