@@ -49,20 +49,39 @@ export interface RuledBackupPayload {
 export interface QuickConfigImportResult {
   /** 新建订阅名，没有自定义规则时为 null */
   name: string | null
-  /** 导入的备份文件名，备份载荷不可用时为 null */
+  /** 导入的备份文件名，备份载荷导入失败时为 null */
   backupFile: string | null
   /** 挂上规则的订阅数 */
   rulesApplied: number
 }
 
-export type QuickConfigErrorCode = 'invalid' | 'profile' | 'rules' | 'restore'
+export type QuickConfigErrorCode =
+  /** 字符串格式错误：不是 Base64、缺少备份前缀或规则段标记异常 */
+  | 'format'
+  /** 字符串格式错误：内容不是合法 JSON */
+  | 'json'
+  /** 类型不匹配：不是本应用导出的快捷配置 */
+  | 'type'
+  /** 字段缺失：类型、版本、范围或规则条目不完整 */
+  | 'missing'
+  /** 版本不一致：配置版本与当前版本不同 */
+  | 'version'
+  /** 范围不一致：导入内容与界面选中的范围不符 */
+  | 'scope'
+  | 'profile'
+  | 'rules'
+  | 'restore'
+  | 'export'
 
 export class QuickConfigError extends Error {
   readonly code: QuickConfigErrorCode
+  /** 提示文案里用到的细节，例如期望版本与实际版本 */
+  readonly params?: Record<string, unknown>
 
-  constructor(code: QuickConfigErrorCode) {
+  constructor(code: QuickConfigErrorCode, params?: Record<string, unknown>) {
     super(code)
     this.code = code
+    this.params = params
     this.name = 'QuickConfigError'
   }
 }
@@ -81,15 +100,24 @@ const decodeBase64 = (base64: string): string => {
   return new TextDecoder().decode(bytes)
 }
 
-/** 校验备份载荷：只接受 `cv1:` 压缩格式，非法字符判为无效；原样返回，前缀必须保留 */
+/** 解码失败（非法字符、补位错误）统一报字符串格式错误 */
+const decodeBase64Checked = (base64: string): string => {
+  try {
+    return decodeBase64(base64)
+  } catch {
+    throw new QuickConfigError('format')
+  }
+}
+
+/** 校验备份载荷：只接受 `cv1:` 压缩格式，非法字符判为字符串格式错误；原样返回，前缀必须保留 */
 const checkedBackupText = (text: string): string => {
   if (!text.startsWith(QUICK_CONFIG_PREFIX)) {
-    throw new QuickConfigError('invalid')
+    throw new QuickConfigError('format')
   }
 
   const body = text.slice(QUICK_CONFIG_PREFIX.length)
   if (!body || !/^[A-Za-z0-9+/]+={0,2}$/u.test(body)) {
-    throw new QuickConfigError('invalid')
+    throw new QuickConfigError('format')
   }
   return text
 }
@@ -97,7 +125,7 @@ const checkedBackupText = (text: string): string => {
 /** 导出载荷里规则段的标记；缺失时视为只有设置 */
 const QUICK_CONFIG_RULE_MARK = '#rules='
 
-/** 校验规则清单结构 */
+/** 校验规则清单结构，条目缺 name / content 视为字段缺失 */
 const checkedRules = (value: unknown): RuledBackupPayload['rules'] => {
   if (
     !Array.isArray(value) ||
@@ -108,7 +136,7 @@ const checkedRules = (value: unknown): RuledBackupPayload['rules'] => {
         typeof rule.content !== 'string',
     )
   ) {
-    throw new QuickConfigError('invalid')
+    throw new QuickConfigError('missing')
   }
 
   return value as RuledBackupPayload['rules']
@@ -122,15 +150,16 @@ const parseRuledBackupText = (text: string): RuledBackupPayload => {
   const ruleLine = rest.join('').trim()
   if (!ruleLine) return { settings, rules: [] }
   if (!ruleLine.startsWith(QUICK_CONFIG_RULE_MARK)) {
-    throw new QuickConfigError('invalid')
+    throw new QuickConfigError('format')
   }
 
   let parsed: unknown
   try {
     const body = ruleLine.slice(QUICK_CONFIG_RULE_MARK.length)
-    parsed = JSON.parse(decodeBase64(body))
-  } catch {
-    throw new QuickConfigError('invalid')
+    parsed = JSON.parse(decodeBase64Checked(body))
+  } catch (err) {
+    if (err instanceof QuickConfigError) throw err
+    throw new QuickConfigError('json')
   }
 
   return { settings, rules: checkedRules(parsed) }
@@ -165,12 +194,12 @@ const exportBackupPayload = async (): Promise<RuledBackupPayload> => {
   const created = (await listLocalBackup()).find(
     (item) => !before.has(item.filename),
   )
-  if (!created) throw new QuickConfigError('invalid')
+  if (!created) throw new QuickConfigError('export')
 
   const payload = await readLocalBackupBase64(created.filename)
   if (!payload || typeof payload.settings !== 'string') {
-    // 旧后端只返回一个 Base64 字符串，这种组合下 rules 必然为空，直接判为无效。
-    throw new QuickConfigError('invalid')
+    // 旧后端只返回一个 Base64 字符串，这种组合下 rules 必然为空，直接判为导出失败。
+    throw new QuickConfigError('export')
   }
 
   return {
@@ -199,24 +228,45 @@ export const exportQuickConfig = async (
   return encodeBase64(JSON.stringify(payload, null, 2))
 }
 
+/**
+ * 解析 JSON 快捷配置：逐项校验字符串格式、载荷类型、必需字段与版本，
+ * 失败时抛出带原因的错误码，便于界面给出具体提示。
+ */
 export const parseQuickConfig = (base64: string): QuickConfigPayload => {
+  const text = decodeBase64Checked(base64)
+
   let payload: unknown
   try {
-    payload = JSON.parse(decodeBase64(base64))
+    payload = JSON.parse(text)
   } catch {
-    throw new QuickConfigError('invalid')
+    throw new QuickConfigError('json')
   }
 
-  const config = payload as QuickConfigPayload
-  if (
-    !config ||
-    typeof config !== 'object' ||
-    config.type !== QUICK_CONFIG_TYPE
-  ) {
-    throw new QuickConfigError('invalid')
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new QuickConfigError('type')
   }
 
-  return config
+  const config = payload as Partial<QuickConfigPayload>
+  if (typeof config.type !== 'string' || !config.type) {
+    throw new QuickConfigError('missing')
+  }
+  if (config.type !== QUICK_CONFIG_TYPE) {
+    throw new QuickConfigError('type')
+  }
+  if (typeof config.version !== 'number') {
+    throw new QuickConfigError('missing')
+  }
+  if (config.version !== QUICK_CONFIG_VERSION) {
+    throw new QuickConfigError('version', {
+      expected: QUICK_CONFIG_VERSION,
+      actual: config.version,
+    })
+  }
+  if (config.scope !== 'all' && config.scope !== 'just-rule') {
+    throw new QuickConfigError('missing')
+  }
+
+  return config as QuickConfigPayload
 }
 
 /** 重名时在末尾追加 `*`，直到名字唯一 */
@@ -276,26 +326,21 @@ const createRuleProfile = async (
   return outcome.status === 'valid' ? uniqueName : null
 }
 
-export interface QuickConfigImportResult {
-  /** 新建订阅名，没有自定义规则时为 null */
-  name: string | null
-  /** 导入的备份文件名，备份载荷导入失败时为 null */
-  backupFile: string | null
-  /** 挂上规则的订阅数 */
-  rulesApplied: number
-}
-
 /**
  * 导入配置：`cv1:` 备份载荷解出「设置 + 规则」——设置落到本地备份目录（复用原有导入函数），
  * 规则挂到新建的订阅上；旧的 JSON 快捷配置则只带一份规则。
+ * `scope` 为界面当前选中的范围，载荷范围与之不符时直接拒绝。
  */
 export const importQuickConfig = async (
   raw: string,
+  scope: QuickConfigScope,
 ): Promise<QuickConfigImportResult> => {
   const text = raw.trim()
-  if (!text) throw new QuickConfigError('invalid')
+  if (!text) throw new QuickConfigError('format')
 
   if (text.startsWith(QUICK_CONFIG_PREFIX)) {
+    if (scope !== 'all') throw new QuickConfigError('scope')
+
     const payload = parseRuledBackupText(text)
     const filename = uniqueBackupFileName(
       new Set((await listLocalBackup()).map((item) => item.filename)),
@@ -323,6 +368,8 @@ export const importQuickConfig = async (
   }
 
   const payload = parseQuickConfig(text)
+  if (payload.scope !== scope) throw new QuickConfigError('scope')
+
   const customRule = payload['custom-rule']
   if (!customRule || typeof customRule !== 'object') {
     return { name: null, backupFile: null, rulesApplied: 0 }

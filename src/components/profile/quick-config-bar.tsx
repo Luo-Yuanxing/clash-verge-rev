@@ -24,15 +24,22 @@ import {
   exportQuickConfig,
   importQuickConfig,
   QuickConfigError,
+  type QuickConfigErrorCode,
   type QuickConfigScope,
 } from '@/services/quick-config'
 
 const ERROR_KEYS = {
-  invalid: 'profiles.page.quickConfig.feedback.invalid',
+  format: 'profiles.page.quickConfig.feedback.badFormat',
+  json: 'profiles.page.quickConfig.feedback.badJson',
+  type: 'profiles.page.quickConfig.feedback.badType',
+  missing: 'profiles.page.quickConfig.feedback.missingField',
+  version: 'profiles.page.quickConfig.feedback.versionMismatch',
+  scope: 'profiles.page.quickConfig.feedback.scopeMismatch',
   profile: 'profiles.page.quickConfig.feedback.profileFailed',
   rules: 'profiles.page.quickConfig.feedback.rulesFailed',
   restore: 'profiles.page.quickConfig.feedback.importBackupFailed',
-} as const
+  export: 'profiles.page.quickConfig.feedback.exportFailed',
+} as const satisfies Record<QuickConfigErrorCode, string>
 
 const TOGGLE_SX = {
   px: 1.5,
@@ -55,7 +62,7 @@ export const QuickConfigBar = () => {
     } catch (err) {
       showNotice.error(
         err instanceof QuickConfigError
-          ? ERROR_KEYS[err.code]
+          ? { key: ERROR_KEYS[err.code], params: err.params }
           : 'profiles.page.quickConfig.feedback.failed',
       )
     } finally {
@@ -73,7 +80,7 @@ export const QuickConfigBar = () => {
 
   const onImport = () =>
     run(async () => {
-      const result = await importQuickConfig(text)
+      const result = await importQuickConfig(text, scope)
       await revalidateQuery(['getProfiles'])
       await revalidateQuery(['getVergeConfig'])
 

@@ -530,15 +530,21 @@ export interface TranslationResources {
         quickConfig: {
           export: string
           feedback: {
+            badFormat: string
+            badJson: string
+            badType: string
             exported: string
+            exportFailed: string
             failed: string
             importBackupFailed: string
             imported: string
             importedBackup: string
             importedSettingsOnly: string
-            invalid: string
+            missingField: string
             profileFailed: string
             rulesFailed: string
+            scopeMismatch: string
+            versionMismatch: string
           }
           import: string
           placeholder: string
