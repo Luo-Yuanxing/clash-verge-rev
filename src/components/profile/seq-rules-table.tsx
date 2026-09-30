@@ -4,12 +4,12 @@ import {
   FilterListRounded,
 } from '@mui/icons-material'
 import {
-  Autocomplete,
   Box,
   Checkbox,
   IconButton,
   Menu,
   MenuItem,
+  Select,
   TextField,
   Tooltip,
   Typography,
@@ -89,9 +89,12 @@ const cellFieldProps = {
     },
   },
 }
-const cellAutocompleteProps = {
+/** 类型与策略的单元格下拉统一成紧凑样式 */
+const cellSelectProps = {
+  variant: 'standard' as const,
   size: 'small' as const,
-  disableClearable: true,
+  disableUnderline: true,
+  sx: { fontSize: '0.875rem' },
 }
 
 /** 规则类型下拉选项：值是写入规则的字符串 */
@@ -130,10 +133,9 @@ export const SeqRulesTable = (props: Props) => {
   /**
    * 提交整行：任何一项改动都当作一次编辑，未改动的属性沿用原值；
    * 草稿先清掉再算结果，避免把这次提交过的草稿带进下一轮比较。
-   * 下拉选择会立刻提交，用 extra 传入刚选中的值，不必等重新渲染。
    */
-  const commitDraft = (id: string, row: SeqRuleRow, extra?: RuleDraft) => {
-    const draft = extra ?? drafts[id]
+  const commitDraft = (id: string, row: SeqRuleRow) => {
+    const draft = drafts[id]
     setDrafts((prev) => {
       if (!(id in prev)) return prev
       const next = { ...prev }
@@ -144,6 +146,19 @@ export const SeqRulesTable = (props: Props) => {
 
     // DOMAIN-SUFFIX 的域名归一化与 no-resolve 保留交给 serializeRuleParts
     const next = serializeRuleParts({ ...parseRuleParts(row.rule), ...draft })
+    if (next && next !== row.rule) onEdit(row, next)
+  }
+
+  /** 选择下拉后直接提交，选中的值作为草稿传入，不必等重新渲染 */
+  const commitField = (id: string, row: SeqRuleRow, patch: RuleDraft) => {
+    setDrafts((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+
+    const next = serializeRuleParts({ ...parseRuleParts(row.rule), ...patch })
     if (next && next !== row.rule) onEdit(row, next)
   }
 
@@ -170,16 +185,13 @@ export const SeqRulesTable = (props: Props) => {
     const parts = parseRuleParts(rule)
     const draft = drafts[entry.id] ?? {}
     const { host, policy, type } = parts
-    /** 下拉只提供已知选项，策略列额外带上这一行当前的值 */
+    /** 下拉只提供已知选项，未知的当前值补进选项里，避免选中项显示为空 */
     const policyOptions = builtinProxyPolicies.includes(policy)
       ? builtinProxyPolicies
       : [...builtinProxyPolicies, policy]
-    const selectedType: string | null = ruleTypeNames.includes(type)
-      ? type
-      : null
-    const selectedPolicy: string | null = policyOptions.includes(policy)
-      ? policy
-      : null
+    const typeOptions = ruleTypeNames.includes(type)
+      ? ruleTypeNames
+      : [type, ...ruleTypeNames]
 
     return (
       <Box
@@ -227,34 +239,32 @@ export const SeqRulesTable = (props: Props) => {
             if (event.key === 'Enter') event.currentTarget.blur()
           }}
         />
-        <Autocomplete
-          {...cellAutocompleteProps}
-          options={ruleTypeNames}
-          value={selectedType}
-          getOptionLabel={(option) => t(RULE_TYPE_LABEL_KEYS[option] ?? option)}
-          renderInput={(params) => (
-            <TextField {...params} {...cellFieldProps} />
-          )}
-          onChange={(_, value) => {
-            commitDraft(entry.id, entry.item, { type: value ?? type })
+        <Select
+          {...cellSelectProps}
+          value={type}
+          onChange={(event) => {
+            commitField(entry.id, entry.item, { type: event.target.value })
           }}
-          onBlur={() => commitDraft(entry.id, entry.item)}
-        />
-        <Autocomplete
-          {...cellAutocompleteProps}
-          options={policyOptions}
-          value={selectedPolicy}
-          getOptionLabel={(option) =>
-            t(PROXY_POLICY_LABEL_KEYS[option] ?? option)
-          }
-          renderInput={(params) => (
-            <TextField {...params} {...cellFieldProps} />
-          )}
-          onChange={(_, value) => {
-            commitDraft(entry.id, entry.item, { policy: value ?? policy })
+        >
+          {typeOptions.map((option) => (
+            <MenuItem key={option} value={option}>
+              {t(RULE_TYPE_LABEL_KEYS[option] ?? option)}
+            </MenuItem>
+          ))}
+        </Select>
+        <Select
+          {...cellSelectProps}
+          value={policy}
+          onChange={(event) => {
+            commitField(entry.id, entry.item, { policy: event.target.value })
           }}
-          onBlur={() => commitDraft(entry.id, entry.item)}
-        />
+        >
+          {policyOptions.map((option) => (
+            <MenuItem key={option} value={option}>
+              {t(PROXY_POLICY_LABEL_KEYS[option] ?? option)}
+            </MenuItem>
+          ))}
+        </Select>
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           {!sortable && (
             <IconButton size="small" onClick={() => onDelete(entry.item)}>
