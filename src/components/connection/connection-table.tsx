@@ -78,6 +78,8 @@ interface BaseColumn {
   align?: 'left' | 'right'
   /** 未手动调整过宽度时，按列内容的实际宽度决定 */
   autoWidth?: boolean
+  /** 默认不显示，需要时可在列设置里打开 */
+  defaultHidden?: boolean
   cell?: (row: IConnectionsItem, snapshot: TableRowSnapshot) => string
 }
 
@@ -123,6 +125,16 @@ const resolveColumnSize = (
   }
 
   return column.width
+}
+
+/** 列是否可见：手动开关优先，否则看默认隐藏 */
+const isColumnVisible = (
+  column: BaseColumn,
+  model: VisibilityState | undefined,
+) => {
+  const explicit = model?.[column.field]
+  if (explicit !== undefined) return explicit !== false
+  return !column.defaultHidden
 }
 
 const sameStaticConnection = (
@@ -581,18 +593,21 @@ export const ConnectionTable = (props: Props) => {
         headerName: t('connections.components.fields.source'),
         width: 160,
         minWidth: 120,
+        defaultHidden: true,
       },
       {
         field: 'remoteDestination',
         headerName: t('connections.components.fields.destination'),
         width: 160,
         minWidth: 120,
+        defaultHidden: true,
       },
       {
         field: 'type',
         headerName: t('connections.components.fields.type'),
         width: 120,
         minWidth: 80,
+        defaultHidden: true,
       },
     ]
   }, [t])
@@ -683,11 +698,16 @@ export const ConnectionTable = (props: Props) => {
     return widths
   }, [baseColumns, connections, getRowSnapshot, measureText])
 
-  const visibleColumns = useMemo<DisplayColumn[]>(() => {
-    return orderedColumns
-      .filter(
-        (column) => (columnVisibilityModel?.[column.field] ?? true) !== false,
-      )
+  const [viewport, setViewport] = useState({
+    scrollTop: 0,
+    height: 0,
+    width: 0,
+  })
+
+  /** 列宽先按内容与固定值算出，再等比拉伸填满窗口 */
+  const { columns: visibleColumns, columnScale } = useMemo(() => {
+    const columns = orderedColumns
+      .filter((column) => isColumnVisible(column, columnVisibilityModel))
       .map((column) => ({
         ...column,
         size: resolveColumnSize(
@@ -696,19 +716,44 @@ export const ConnectionTable = (props: Props) => {
           autoColumnWidths.get(column.field),
         ),
       }))
-  }, [columnVisibilityModel, columnWidths, orderedColumns, autoColumnWidths])
+
+    const total = columns.reduce((sum, column) => sum + column.size, 0)
+    const available = viewport.width - SELECT_COLUMN_WIDTH
+    if (total === 0 || available <= total) return { columns, columnScale: 1 }
+
+    const scale = available / total
+    let used = 0
+    const scaled = columns.map((column, index) => {
+      // 最后一列吸收取整余量，避免总和超出容器
+      if (index === columns.length - 1) {
+        return { ...column, size: available - used }
+      }
+      const size = Math.floor(column.size * scale)
+      used += size
+      return { ...column, size }
+    })
+
+    return { columns: scaled, columnScale: scale }
+  }, [
+    columnVisibilityModel,
+    columnWidths,
+    orderedColumns,
+    autoColumnWidths,
+    viewport.width,
+  ])
 
   const [sorting, setSorting] = useState<SortingState | null>(null)
-  const [viewport, setViewport] = useState({ scrollTop: 0, height: 0 })
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const updateViewport = useCallback((element: HTMLDivElement) => {
     setViewport((current) => {
       const next = {
         scrollTop: element.scrollTop,
         height: element.clientHeight,
+        width: element.clientWidth,
       }
       return current.scrollTop === next.scrollTop &&
-        current.height === next.height
+        current.height === next.height &&
+        current.width === next.width
         ? current
         : next
     })
@@ -828,22 +873,18 @@ export const ConnectionTable = (props: Props) => {
   const setColumnVisibility = useCallback(
     (field: ColumnField, visible: boolean) => {
       setColumnVisibilityModel((prev) => {
-        const current = prev ?? {}
-        const visibleCount = baseColumns.reduce((count, column) => {
-          if (column.field === field) return count + (visible ? 1 : 0)
-          return count + ((current[column.field] ?? true) !== false ? 1 : 0)
-        }, 0)
-        if (visibleCount === 0) return current
+        const current = { ...(prev ?? {}) }
+        const visibleCount = baseColumns.reduce(
+          (count, column) =>
+            column.field === field
+              ? count + (visible ? 1 : 0)
+              : count + (isColumnVisible(column, current) ? 1 : 0),
+          0,
+        )
+        if (visibleCount === 0) return prev
 
-        const next: VisibilityState = {}
-        baseColumns.forEach((column) => {
-          if (column.field === field) {
-            if (!visible) next[column.field] = false
-          } else if (current[column.field] === false) {
-            next[column.field] = false
-          }
-        })
-        return next
+        current[field] = visible
+        return current
       })
     },
     [baseColumns, setColumnVisibilityModel],
@@ -868,7 +909,7 @@ export const ConnectionTable = (props: Props) => {
     return orderedColumns.map((column) => ({
       id: column.field,
       label: column.headerName,
-      visible: (columnVisibilityModel?.[column.field] ?? true) !== false,
+      visible: isColumnVisible(column, columnVisibilityModel),
       toggleVisibility: (visible) => setColumnVisibility(column.field, visible),
     }))
   }, [columnVisibilityModel, orderedColumns, setColumnVisibility])
@@ -880,11 +921,12 @@ export const ConnectionTable = (props: Props) => {
       startWidth: number,
       minWidth: number,
       maxWidth: number | undefined,
+      scale: number,
     ) => {
       const handleMove = (clientX: number) => {
         const nextWidth = Math.max(
           minWidth,
-          startWidth + clientX - startClientX,
+          startWidth + (clientX - startClientX) / scale,
         )
         setColumnWidths((prev) => ({
           ...(prev ?? {}),
@@ -921,12 +963,13 @@ export const ConnectionTable = (props: Props) => {
       startResize(
         column.field,
         event.clientX,
-        column.size,
+        column.size / columnScale,
         column.minWidth,
         column.maxWidth,
+        columnScale,
       )
     },
-    [startResize],
+    [columnScale, startResize],
   )
 
   const handleResizeTouchStart = useCallback(
@@ -937,12 +980,13 @@ export const ConnectionTable = (props: Props) => {
       startResize(
         column.field,
         touch.clientX,
-        column.size,
+        column.size / columnScale,
         column.minWidth,
         column.maxWidth,
+        columnScale,
       )
     },
-    [startResize],
+    [columnScale, startResize],
   )
 
   const borderColor = theme.palette.divider
