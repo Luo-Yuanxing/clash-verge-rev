@@ -694,6 +694,7 @@ const ConnectionsPage = () => {
           onToggleSelectAll={toggleSelectAll}
           getHostProbeState={getHostProbeState}
           hostWithoutPort={connectionsType === 'history'}
+          hideTrafficColumns={connectionsType === 'history'}
         />
       ) : (
         <VirtualList

@@ -66,6 +66,14 @@ type ColumnField =
   | 'remoteDestination'
   | 'type'
 
+/** 历史列表按主机聚合，不再展示上下行总量与实时速度这几列 */
+const TRAFFIC_FIELDS: readonly ColumnField[] = [
+  'download',
+  'upload',
+  'dlSpeed',
+  'ulSpeed',
+]
+
 type VisibilityState = Record<string, boolean>
 
 interface BaseColumn {
@@ -436,6 +444,8 @@ interface Props {
   getHostProbeState: (host: string) => HostProbeState | undefined
   /** 历史列表按域名聚合，主机列只显示域名，不带目标端口 */
   hostWithoutPort?: boolean
+  /** 历史列表不展示流量相关的列 */
+  hideTrafficColumns?: boolean
 }
 
 export const ConnectionTable = (props: Props) => {
@@ -449,6 +459,7 @@ export const ConnectionTable = (props: Props) => {
     onToggleSelectAll,
     getHostProbeState,
     hostWithoutPort = false,
+    hideTrafficColumns = false,
   } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
@@ -590,6 +601,17 @@ export const ConnectionTable = (props: Props) => {
     ]
   }, [t])
 
+  const hiddenFields = hideTrafficColumns ? TRAFFIC_FIELDS : undefined
+
+  /** 实际可用的列：隐藏的列既不显示，也不参与列设置 */
+  const availableColumns = useMemo(
+    () =>
+      hiddenFields
+        ? baseColumns.filter((column) => !hiddenFields.includes(column.field))
+        : baseColumns,
+    [baseColumns, hiddenFields],
+  )
+
   useEffect(() => {
     setColumnOrder((prevValue) => {
       const baseFields = baseColumns.map((col) => col.field)
@@ -628,14 +650,14 @@ export const ConnectionTable = (props: Props) => {
     const baseFields = baseColumns.map((column) => column.field)
     const reconciledOrder = reconcileColumnOrder(columnOrder, baseFields)
     const byField: Partial<Record<ColumnField, BaseColumn>> = {}
-    baseColumns.forEach((column) => {
+    availableColumns.forEach((column) => {
       byField[column.field] = column
     })
 
     return reconciledOrder
       .map((field) => byField[field as ColumnField])
       .filter((column): column is BaseColumn => Boolean(column))
-  }, [baseColumns, columnOrder])
+  }, [availableColumns, baseColumns, columnOrder])
 
   /** 测量文本实际宽度，结果按文本缓存 */
   const measureText = useMemo(() => {
@@ -660,7 +682,7 @@ export const ConnectionTable = (props: Props) => {
     const widths = new Map<ColumnField, number>()
     if (!measureText) return widths
 
-    for (const column of baseColumns) {
+    for (const column of availableColumns) {
       if (!column.autoWidth) continue
 
       let width = measureText(column.headerName) + CELL_PADDING_WIDTH
@@ -678,7 +700,7 @@ export const ConnectionTable = (props: Props) => {
     }
 
     return widths
-  }, [baseColumns, connections, getRowSnapshot, measureText])
+  }, [availableColumns, connections, getRowSnapshot, measureText])
 
   const [viewport, setViewport] = useState({
     scrollTop: 0,
@@ -791,6 +813,7 @@ export const ConnectionTable = (props: Props) => {
 
   const sortedConnections = useMemo(() => {
     if (!sorting) return connections
+    if (hiddenFields?.includes(sorting.id)) return connections
 
     const direction = sorting.desc ? -1 : 1
     return [...connections].sort(
@@ -798,7 +821,7 @@ export const ConnectionTable = (props: Props) => {
         compareConnectionCellValue(sorting.id, left, right, getRowSnapshot) *
         direction,
     )
-  }, [connections, sorting, getRowSnapshot])
+  }, [connections, hiddenFields, sorting, getRowSnapshot])
 
   const tableWidth = useMemo(
     () =>
@@ -855,7 +878,7 @@ export const ConnectionTable = (props: Props) => {
     (field: ColumnField, visible: boolean) => {
       setColumnVisibilityModel((prev) => {
         const current = { ...(prev ?? {}) }
-        const visibleCount = baseColumns.reduce(
+        const visibleCount = availableColumns.reduce(
           (count, column) =>
             column.field === field
               ? count + (visible ? 1 : 0)
@@ -868,15 +891,29 @@ export const ConnectionTable = (props: Props) => {
         return current
       })
     },
-    [baseColumns, setColumnVisibilityModel],
+    [availableColumns, setColumnVisibilityModel],
   )
 
   const handleManagerOrderChange = useCallback(
     (order: string[]) => {
       const baseFields = baseColumns.map((col) => col.field)
-      setColumnOrder(reconcileColumnOrder(order, baseFields))
+
+      if (!hiddenFields) {
+        setColumnOrder(reconcileColumnOrder(order, baseFields))
+        return
+      }
+
+      // 隐藏的列留在原位，其余列按新顺序依次填进空位
+      let index = 0
+      setColumnOrder(
+        reconcileColumnOrder(columnOrder, baseFields).map((field) =>
+          hiddenFields.includes(field as ColumnField)
+            ? field
+            : (order[index++] ?? field),
+        ),
+      )
     },
-    [baseColumns, setColumnOrder],
+    [baseColumns, columnOrder, hiddenFields, setColumnOrder],
   )
 
   const handleResetColumns = useCallback(() => {
