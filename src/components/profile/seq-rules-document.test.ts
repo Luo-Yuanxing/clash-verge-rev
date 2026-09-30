@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   applyRuleEnabled,
+  emptySeqRulesConfig,
   findFirstNonEmptyRulesUid,
+  hasSeqRules,
+  mergeSeqRules,
   removeSeqRule,
   type SeqRulesConfig,
   type SeqRulesDocument,
@@ -238,5 +241,35 @@ describe('removeSeqRule', () => {
     )
 
     expect(next.disabled.append).toEqual([])
+  })
+})
+
+describe('mergeSeqRules', () => {
+  it('keeps the first copy of each rule and ORs the exclude flag', () => {
+    const merged = mergeSeqRules([
+      config({ prepend: ['DOMAIN,a.com,DIRECT'] }),
+      config({
+        prepend: ['DOMAIN,a.com,DIRECT', 'DOMAIN,b.com,DIRECT'],
+        append: ['MATCH,DIRECT'],
+        disabled: { prepend: [], append: ['DOMAIN,off.com,DIRECT'] },
+        excludeSubscriptionRules: true,
+      }),
+    ])
+
+    expect(merged.prepend).toEqual([
+      'DOMAIN,a.com,DIRECT',
+      'DOMAIN,b.com,DIRECT',
+    ])
+    expect(merged.append).toEqual(['MATCH,DIRECT'])
+    expect(merged.disabled.append).toEqual(['DOMAIN,off.com,DIRECT'])
+    expect(merged.excludeSubscriptionRules).toBe(true)
+  })
+
+  it('only counts excludeSubscriptionRules or rules as content', () => {
+    expect(hasSeqRules(emptySeqRulesConfig())).toBe(false)
+    expect(
+      hasSeqRules({ ...emptySeqRulesConfig(), excludeSubscriptionRules: true }),
+    ).toBe(true)
+    expect(hasSeqRules(config({ append: ['MATCH,DIRECT'] }))).toBe(true)
   })
 })
