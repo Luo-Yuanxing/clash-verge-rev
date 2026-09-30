@@ -26,6 +26,7 @@ export const translationKeys = [
   'connections.components.actions.createRule',
   'connections.components.actions.probe',
   'connections.components.actions.probing',
+  'connections.components.actions.selectFailed',
   'connections.components.probe.error',
   'connections.components.history.window',
   'connections.components.filters.title',

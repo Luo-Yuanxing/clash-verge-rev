@@ -13,7 +13,9 @@ import {
   Box,
   Button,
   ButtonGroup,
+  Checkbox,
   Fab,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Tooltip,
@@ -289,6 +291,32 @@ const ConnectionsPage = () => {
 
   const runProbe = useLockFn(() => runHostProbe(probeTargets))
 
+  /** 探测未响应的连接（列表里标红/爆红的那些） */
+  const failedConnectionIds = useMemo(() => {
+    const ids: string[] = []
+    for (const connection of filterConn) {
+      const host = hostKeyOfConnection(connection)
+      if (host && getHostProbeState(host)?.status === 'fail')
+        ids.push(connection.id)
+    }
+    return ids
+  }, [filterConn, getHostProbeState])
+
+  const failedSelectedCount = useMemo(
+    () => failedConnectionIds.filter((id) => selectedIds.has(id)).length,
+    [failedConnectionIds, selectedIds],
+  )
+
+  /** 一键选择爆红：先清空原有选择，只留下探测未响应的连接 */
+  const toggleSelectFailed = useCallback(
+    (checked: boolean) => {
+      setSelectedIds(
+        checked ? new Set<string>(failedConnectionIds) : new Set<string>(),
+      )
+    },
+    [failedConnectionIds],
+  )
+
   const probingCount = useMemo(() => {
     let count = 0
     for (const target of probeTargets) {
@@ -537,6 +565,30 @@ const ConnectionsPage = () => {
             </Button>
           </span>
         </Tooltip>
+        <FormControlLabel
+          sx={{
+            mr: 1,
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            '& .MuiFormControlLabel-label': { fontSize: 14 },
+          }}
+          control={
+            <Checkbox
+              size="small"
+              disabled={failedConnectionIds.length === 0}
+              checked={
+                failedConnectionIds.length > 0 &&
+                failedSelectedCount === failedConnectionIds.length
+              }
+              indeterminate={
+                failedSelectedCount > 0 &&
+                failedSelectedCount < failedConnectionIds.length
+              }
+              onChange={(e) => toggleSelectFailed(e.target.checked)}
+            />
+          }
+          label={t('connections.components.actions.selectFailed')}
+        />
         {!isTableLayout && (
           <BaseStyledSelect
             value={curOrderOpt}

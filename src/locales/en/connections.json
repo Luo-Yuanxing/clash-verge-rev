@@ -30,7 +30,8 @@
       "resume": "Resume refresh",
       "createRule": "Create rules",
       "probe": "Probe hosts",
-      "probing": "Probing…"
+      "probing": "Probing…",
+      "selectFailed": "Select blocked"
     },
     "probe": {
       "error": "No response within {{seconds}}s: unreachable or blocked"

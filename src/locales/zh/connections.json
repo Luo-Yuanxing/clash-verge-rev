@@ -30,7 +30,8 @@
       "resume": "恢复刷新",
       "createRule": "创建规则",
       "probe": "主动探测",
-      "probing": "探测中…"
+      "probing": "探测中…",
+      "selectFailed": "选择爆红"
     },
     "probe": {
       "error": "{{seconds}} 秒内未收到响应，可能无法连接或被阻断"

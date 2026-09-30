@@ -15,6 +15,7 @@ export interface TranslationResources {
           probe: string
           probing: string
           resume: string
+          selectFailed: string
         }
         columnManager: {
           dragHandle: string
