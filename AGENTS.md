@@ -56,7 +56,9 @@ hook 已通过 `git config --local core.hooksPath .git/hooks-disabled` 关闭。
 pnpm typecheck && pnpm lint && pnpm format:check && pnpm test
 ```
 
-后端 Rust 改动追加 `cargo clippy-all`。检查通过即可提交，无需额外流程。
+后端 Rust 改动追加 `cargo clippy-all`。
+
+回答结束即可提交。
 
 ## 提交风格
 
