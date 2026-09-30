@@ -33,6 +33,14 @@
     "history": {
       "window": "{{count}} 分钟"
     },
+    "chains": {
+      "all": "全部链路",
+      "filter": "按链路筛选"
+    },
+    "covered": {
+      "show": "显示已被自定义规则覆盖的主机",
+      "hide": "隐藏已被自定义规则覆盖的主机"
+    },
     "columnManager": {
       "title": "列设置",
       "dragHandle": "拖拽控件"

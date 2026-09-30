@@ -14,9 +14,17 @@ export interface TranslationResources {
           pause: string
           resume: string
         }
+        chains: {
+          all: string
+          filter: string
+        }
         columnManager: {
           dragHandle: string
           title: string
+        }
+        covered: {
+          hide: string
+          show: string
         }
         fields: {
           chains: string

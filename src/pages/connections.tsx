@@ -1,5 +1,7 @@
 import {
   DeleteForeverRounded,
+  FilterAltOffRounded,
+  FilterAltRounded,
   PauseRounded,
   PlayArrowRounded,
   RuleRounded,
@@ -36,6 +38,7 @@ import {
 } from '@/components/connection/connection-detail'
 import { ConnectionRowItem } from '@/components/connection/connection-row-item'
 import {
+  formatConnectionChains,
   getConnectionStartTime,
   useConnectionRowViews,
 } from '@/components/connection/connection-row-view'
@@ -51,6 +54,7 @@ import {
   HISTORY_WINDOW_OPTIONS,
   useConnectionSetting,
 } from '@/hooks/use-connection-setting'
+import { useCustomRuleCoverage } from '@/hooks/use-custom-rule-coverage'
 import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVisibility } from '@/hooks/use-visibility'
 import { isIpAddress } from '@/utils/network'
@@ -104,6 +108,10 @@ const ConnectionsPage = () => {
   const [curOrderOpt, setCurOrderOpt] = useState<OrderKey>('default')
   const [connectionsType, setConnectionsType] =
     useState<ConnectionsType>('active')
+  /** 按链路筛选，空串表示全部链路 */
+  const [curChain, setCurChain] = useState('')
+  /** 历史列表默认隐藏已被自定义规则覆盖的主机 */
+  const [hideCovered, setHideCovered] = useState(true)
 
   const {
     response: { data: connections },
@@ -115,6 +123,8 @@ const ConnectionsPage = () => {
   } = useTrafficData({ enabled: pageVisible })
 
   const [setting, setSetting] = useConnectionSetting()
+
+  const isHostCovered = useCustomRuleCoverage(pageVisible)
 
   const historyWindowMs = setting.historyWindowMs ?? DEFAULT_HISTORY_WINDOW_MS
 
@@ -192,13 +202,36 @@ const ConnectionsPage = () => {
     return ids
   }, [viewConnections])
 
+  /** 当前列表里出现过的链路种类，下拉选项与之一一对应 */
+  const chainOptions = useMemo(() => {
+    const chains = new Set<string>()
+    for (const connection of selectedConnections) {
+      const chain = formatConnectionChains(connection.chains)
+      if (chain) chains.add(chain)
+    }
+    return [...chains].sort((a, b) => a.localeCompare(b))
+  }, [selectedConnections])
+
+  /** 列表中仍存在的链路，否则视为“全部链路” */
+  const activeChain = chainOptions.includes(curChain) ? curChain : ''
+
   const filterConn = useMemo(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
 
-    if (isTableLayout && !hasSearch) return selectedConnections
-    if (!hasSearch) return orderFunc([...selectedConnections])
+    let list = selectedConnections
+    if (activeChain) {
+      list = list.filter(
+        (conn) => formatConnectionChains(conn.chains) === activeChain,
+      )
+    }
+    if (connectionsType === 'history' && hideCovered) {
+      list = list.filter((conn) => !isHostCovered(conn.metadata?.host ?? ''))
+    }
 
-    const matchConns = selectedConnections.filter((conn) => {
+    if (isTableLayout && !hasSearch) return list
+    if (!hasSearch) return orderFunc([...list])
+
+    const matchConns = list.filter((conn) => {
       const { host, destinationIP, process } = conn.metadata
       return (
         match(host || '') || match(destinationIP || '') || match(process || '')
@@ -206,7 +239,17 @@ const ConnectionsPage = () => {
     })
 
     return orderFunc ? orderFunc(matchConns) : matchConns
-  }, [selectedConnections, isTableLayout, hasSearch, match, curOrderOpt])
+  }, [
+    selectedConnections,
+    isTableLayout,
+    hasSearch,
+    match,
+    curOrderOpt,
+    activeChain,
+    connectionsType,
+    hideCovered,
+    isHostCovered,
+  ])
 
   const displayRows = useConnectionRowViews(
     isTableLayout ? EMPTY_CONNECTIONS : filterConn,
@@ -411,6 +454,33 @@ const ConnectionsPage = () => {
             ))}
           </BaseStyledSelect>
         )}
+        {connectionsType === 'history' && (
+          <Tooltip
+            title={t(
+              hideCovered
+                ? 'connections.components.covered.show'
+                : 'connections.components.covered.hide',
+            )}
+          >
+            <IconButton
+              size="small"
+              color={hideCovered ? 'primary' : 'inherit'}
+              aria-label={t(
+                hideCovered
+                  ? 'connections.components.covered.show'
+                  : 'connections.components.covered.hide',
+              )}
+              onClick={() => setHideCovered((value) => !value)}
+              sx={{ flex: '0 0 auto' }}
+            >
+              {hideCovered ? (
+                <FilterAltRounded fontSize="small" />
+              ) : (
+                <FilterAltOffRounded fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        )}
         {!isTableLayout && (
           <BaseStyledSelect
             value={curOrderOpt}
@@ -419,6 +489,28 @@ const ConnectionsPage = () => {
             {ORDER_OPTIONS.map((option) => (
               <MenuItem key={option.id} value={option.id}>
                 <span style={{ fontSize: 14 }}>{t(option.labelKey)}</span>
+              </MenuItem>
+            ))}
+          </BaseStyledSelect>
+        )}
+        {!isTableLayout && (
+          <BaseStyledSelect
+            value={activeChain}
+            displayEmpty
+            onChange={(e) => setCurChain(e.target.value)}
+            renderValue={(selected) =>
+              selected || t('connections.components.chains.all')
+            }
+            aria-label={t('connections.components.chains.filter')}
+          >
+            <MenuItem value="">
+              <span style={{ fontSize: 14 }}>
+                {t('connections.components.chains.all')}
+              </span>
+            </MenuItem>
+            {chainOptions.map((chain) => (
+              <MenuItem key={chain} value={chain}>
+                <span style={{ fontSize: 14 }}>{chain}</span>
               </MenuItem>
             ))}
           </BaseStyledSelect>
@@ -496,6 +588,9 @@ const ConnectionsPage = () => {
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
+          chainFilter={activeChain}
+          chainOptions={chainOptions}
+          onChainFilterChange={setCurChain}
         />
       ) : (
         <VirtualList

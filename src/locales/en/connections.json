@@ -33,6 +33,14 @@
     "history": {
       "window": "{{count}} min"
     },
+    "chains": {
+      "all": "All chains",
+      "filter": "Filter by chain"
+    },
+    "covered": {
+      "show": "Show hosts covered by custom rules",
+      "hide": "Hide hosts covered by custom rules"
+    },
     "columnManager": {
       "title": "Columns",
       "dragHandle": "Drag handle"

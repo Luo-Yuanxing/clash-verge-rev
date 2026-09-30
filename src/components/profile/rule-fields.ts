@@ -19,6 +19,50 @@ export const parseRule = (ruleRaw: string): ParsedRule => {
   return { type, host, policy }
 }
 
+/** 只有域名类规则能判断主机名是否已命中 */
+const DOMAIN_RULE_TYPES = new Set([
+  'DOMAIN',
+  'DOMAIN-SUFFIX',
+  'DOMAIN-KEYWORD',
+  'DOMAIN-REGEX',
+])
+
+/** 判断一条规则是否覆盖主机名；非域名类规则（IP-CIDR、GEOSITE 等）一律返回 false */
+export const ruleCoversHost = (rule: string, host: string): boolean => {
+  const target = host.trim().toLowerCase()
+  if (!target) return false
+
+  const { type, host: condition } = parseRule(rule)
+  const ruleType = type.trim().toUpperCase()
+  const value = condition.trim()
+  if (!DOMAIN_RULE_TYPES.has(ruleType) || !value) return false
+
+  switch (ruleType) {
+    case 'DOMAIN':
+      return target === value.toLowerCase()
+    case 'DOMAIN-SUFFIX': {
+      const suffix = value.toLowerCase().replace(/^\./, '')
+      return target === suffix || target.endsWith(`.${suffix}`)
+    }
+    case 'DOMAIN-KEYWORD':
+      return target.includes(value.toLowerCase())
+    case 'DOMAIN-REGEX':
+      try {
+        return new RegExp(value, 'i').test(target)
+      } catch {
+        return false
+      }
+    default:
+      return false
+  }
+}
+
+/** 主机名是否被其中任意一条规则覆盖 */
+export const isHostCoveredByRules = (
+  rules: readonly string[],
+  host: string,
+): boolean => rules.some((rule) => ruleCoversHost(rule, host))
+
 /** 反转主机名的标签，得到按域名层级（一级 → 二级 → …）比较的键 */
 const hostLevelKey = (host: string): string =>
   host.toLowerCase().split('.').reverse().join('.')

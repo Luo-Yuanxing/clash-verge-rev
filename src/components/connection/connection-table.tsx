@@ -1,4 +1,5 @@
-import { Checkbox } from '@mui/material'
+import { FilterListRounded } from '@mui/icons-material'
+import { Checkbox, MenuItem, Select } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { useLocalStorage } from 'foxact/use-local-storage'
 import {
@@ -254,6 +255,71 @@ const selectCellStyle = {
   justifyContent: 'center',
 } as const
 
+interface ChainFilterSelectProps {
+  value: string
+  /** 当前列表中出现的链路种类，选项与之一一对应 */
+  options: string[]
+  onChange: (chain: string) => void
+}
+
+/** 表头“链路”列的下拉筛选，空串表示全部 */
+const ChainFilterSelect = (props: ChainFilterSelectProps) => {
+  const { value, options, onChange } = props
+  const { t } = useTranslation()
+  const allChains = t('connections.components.chains.all')
+
+  return (
+    <Select
+      variant="standard"
+      disableUnderline
+      size="small"
+      displayEmpty
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      aria-label={t('connections.components.chains.filter')}
+      renderValue={(selected) => (
+        <span
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            minWidth: 0,
+          }}
+        >
+          <FilterListRounded
+            sx={{ fontSize: 16, opacity: selected ? 1 : 0.5 }}
+          />
+          <span
+            style={{
+              fontSize: 12,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {selected || allChains}
+          </span>
+        </span>
+      )}
+      sx={{
+        flex: '0 0 auto',
+        maxWidth: '55%',
+        mr: 0.75,
+        '& .MuiSelect-select': { py: 0, pr: '16px !important' },
+      }}
+    >
+      <MenuItem value="" dense>
+        <span style={{ fontSize: 13 }}>{allChains}</span>
+      </MenuItem>
+      {options.map((chain) => (
+        <MenuItem key={chain} value={chain} dense>
+          <span style={{ fontSize: 13 }}>{chain}</span>
+        </MenuItem>
+      ))}
+    </Select>
+  )
+}
+
 interface RowComponentProps {
   row: IConnectionsItem
   columns: DisplayColumn[]
@@ -355,6 +421,11 @@ interface Props {
   selectedIds: ReadonlySet<string>
   onToggleSelect: (id: string) => void
   onToggleSelectAll: (ids: string[]) => void
+  /** 链路筛选，空串表示全部 */
+  chainFilter: string
+  /** 当前列表中出现的链路种类 */
+  chainOptions: string[]
+  onChainFilterChange: (chain: string) => void
 }
 
 export const ConnectionTable = (props: Props) => {
@@ -366,6 +437,9 @@ export const ConnectionTable = (props: Props) => {
     selectedIds,
     onToggleSelect,
     onToggleSelectAll,
+    chainFilter,
+    chainOptions,
+    onChainFilterChange,
   } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
@@ -897,6 +971,13 @@ export const ConnectionTable = (props: Props) => {
                           : '▲'
                         : null}
                     </button>
+                    {column.field === 'chains' && (
+                      <ChainFilterSelect
+                        value={chainFilter}
+                        options={chainOptions}
+                        onChange={onChainFilterChange}
+                      />
+                    )}
                     <div
                       onMouseDown={(event) =>
                         handleResizeMouseDown(column, event)
