@@ -26,11 +26,8 @@ import { RuleItem } from '@/components/profile/rule-item'
 import { readProfileFile, saveProfileFile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
-import type { TranslationKey } from '@/types/generated/i18n-keys'
 import type { MonacoEditorInstance } from '@/types/monaco'
 import { MONACO_FONT_FAMILY } from '@/utils/font-family'
-import getSystem from '@/utils/get-system'
-import { isValidIpCidr } from '@/utils/network'
 import { parseYamlSafe } from '@/utils/yaml'
 
 import {
@@ -38,7 +35,14 @@ import {
   type GroupedVirtualItem,
   GroupedVirtualList,
 } from './grouped-virtual-list'
-import { normalizeDomainSuffix } from './rule-fields'
+import {
+  builtinProxyPolicies,
+  normalizeDomainSuffix,
+  PROXY_POLICY_LABEL_KEYS,
+  RULE_TYPE_LABEL_KEYS,
+  type RuleTypeOption,
+  ruleTypeOptions,
+} from './rule-fields'
 import { SeqRulesView } from './seq-rules-view'
 import { useSeqRuleConfig } from './use-seq-rule-config'
 
@@ -52,194 +56,6 @@ interface Props {
   onSave?: (prev?: string, curr?: string) => void
   readOnly?: boolean
 }
-
-const portValidator = (value: string): boolean => {
-  return new RegExp(
-    '^(?:[1-9]\\d{0,3}|[1-5]\\d{4}|6[0-4]\\d{3}|65[0-4]\\d{2}|655[0-2]\\d|6553[0-5])$',
-  ).test(value)
-}
-
-const rules: {
-  name: string
-  required?: boolean
-  example?: string
-  noResolve?: boolean
-  validator?: (value: string) => boolean
-}[] = [
-  {
-    name: 'DOMAIN',
-    example: 'example.com',
-  },
-  {
-    name: 'DOMAIN-SUFFIX',
-    example: 'example.com',
-  },
-  {
-    name: 'DOMAIN-KEYWORD',
-    example: 'example',
-  },
-  {
-    name: 'DOMAIN-REGEX',
-    example: 'example.*',
-  },
-  {
-    name: 'GEOSITE',
-    example: 'youtube',
-  },
-  {
-    name: 'GEOIP',
-    example: 'CN',
-    noResolve: true,
-  },
-  {
-    name: 'SRC-GEOIP',
-    example: 'CN',
-  },
-  {
-    name: 'IP-ASN',
-    example: '13335',
-    noResolve: true,
-    validator: (value) => (+value ? true : false),
-  },
-  {
-    name: 'SRC-IP-ASN',
-    example: '9808',
-    validator: (value) => (+value ? true : false),
-  },
-  {
-    name: 'IP-CIDR',
-    example: '127.0.0.0/8',
-    noResolve: true,
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'IP-CIDR6',
-    example: '2620:0:2d0:200::7/32',
-    noResolve: true,
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'SRC-IP-CIDR',
-    example: '192.168.1.201/32',
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'IP-SUFFIX',
-    example: '8.8.8.8/24',
-    noResolve: true,
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'SRC-IP-SUFFIX',
-    example: '192.168.1.201/8',
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'SRC-PORT',
-    example: '7777',
-    validator: (value) => portValidator(value),
-  },
-  {
-    name: 'DST-PORT',
-    example: '80',
-    validator: (value) => portValidator(value),
-  },
-  {
-    name: 'IN-PORT',
-    example: '7897',
-    validator: (value) => portValidator(value),
-  },
-  {
-    name: 'DSCP',
-    example: '4',
-  },
-  {
-    name: 'PROCESS-NAME',
-    example: getSystem() === 'windows' ? 'chrome.exe' : 'curl',
-  },
-  {
-    name: 'PROCESS-PATH',
-    example:
-      getSystem() === 'windows'
-        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-        : '/usr/bin/wget',
-  },
-  {
-    name: 'PROCESS-NAME-REGEX',
-    example: '.*telegram.*',
-  },
-  {
-    name: 'PROCESS-PATH-REGEX',
-    example:
-      getSystem() === 'windows' ? '(?i).*Application\\chrome.*' : '.*bin/wget',
-  },
-  {
-    name: 'NETWORK',
-    example: 'udp',
-    validator: (value) => ['tcp', 'udp'].includes(value),
-  },
-  {
-    name: 'UID',
-    example: '1001',
-    validator: (value) => (+value ? true : false),
-  },
-  {
-    name: 'IN-TYPE',
-    example: 'SOCKS/HTTP',
-  },
-  {
-    name: 'IN-USER',
-    example: 'mihomo',
-  },
-  {
-    name: 'IN-NAME',
-    example: 'ss',
-  },
-  {
-    name: 'SUB-RULE',
-    example: '(NETWORK,tcp)',
-  },
-  {
-    name: 'RULE-SET',
-    example: 'providername',
-    noResolve: true,
-  },
-  {
-    name: 'AND',
-    example: '((DOMAIN,baidu.com),(NETWORK,UDP))',
-  },
-  {
-    name: 'OR',
-    example: '((NETWORK,UDP),(DOMAIN,baidu.com))',
-  },
-  {
-    name: 'NOT',
-    example: '((DOMAIN,baidu.com))',
-  },
-  {
-    name: 'MATCH',
-    required: false,
-  },
-]
-
-const RULE_TYPE_LABEL_KEYS: Record<string, string> = Object.fromEntries(
-  rules.map((rule) => [
-    rule.name,
-    `rules.modals.editor.ruleTypes.${rule.name}`,
-  ]),
-)
-
-const builtinProxyPolicies = ['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']
-
-const PROXY_POLICY_LABEL_KEYS: Record<string, TranslationKey> =
-  builtinProxyPolicies.reduce(
-    (acc, policy) => {
-      acc[policy] =
-        `proxies.components.enums.policies.${policy}` as TranslationKey
-      return acc
-    },
-    {} as Record<string, TranslationKey>,
-  )
 
 const findRealIndex = (
   list: string[],
@@ -286,7 +102,7 @@ export const RulesEditorViewer = (props: Props) => {
     resetContent,
   } = useSeqRuleConfig(property, open)
 
-  const [ruleType, setRuleType] = useState<(typeof rules)[number]>(rules[0])
+  const [ruleType, setRuleType] = useState<RuleTypeOption>(ruleTypeOptions[0]!)
   const [ruleContent, setRuleContent] = useState('')
   const [noResolve, setNoResolve] = useState(false)
   const [proxyPolicy, setProxyPolicy] = useState(builtinProxyPolicies[0])
@@ -566,7 +382,7 @@ export const RulesEditorViewer = (props: Props) => {
                     size="small"
                     sx={{ minWidth: '240px' }}
                     renderInput={(params) => <TextField {...params} />}
-                    options={rules}
+                    options={ruleTypeOptions}
                     value={ruleType}
                     getOptionLabel={(option) =>
                       t(RULE_TYPE_LABEL_KEYS[option.name] ?? option.name)
