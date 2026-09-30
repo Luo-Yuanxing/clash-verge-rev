@@ -2,11 +2,18 @@ use serde::{Deserialize, Serialize};
 use serde_yaml_ng::{Mapping, Sequence, Value};
 use std::collections::HashSet;
 
+const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SeqMap {
     pub prepend: Sequence,
     pub append: Sequence,
     pub delete: Vec<String>,
+    /// 完全排除订阅规则：只使用自定义规则，未命中一律直连
+    #[serde(default, rename = "exclude-subscription-rules", skip_serializing_if = "is_false")]
+    pub exclude_subscription_rules: bool,
 }
 
 fn collect_proxy_names(seq: &Sequence) -> Vec<String> {
@@ -30,12 +37,25 @@ fn is_selector_group(group_map: &Mapping) -> bool {
         .unwrap_or(false)
 }
 
+/// 判断规则序列中是否已有 MATCH 兜底规则
+fn has_match_rule(rules: &Sequence) -> bool {
+    rules.iter().any(|item| {
+        item.as_str()
+            .and_then(|rule| rule.split(',').next())
+            .is_some_and(|rule_type| rule_type.trim().eq_ignore_ascii_case("MATCH"))
+    })
+}
+
 pub fn use_seq(seq: SeqMap, mut config: Mapping, field: &str) -> Mapping {
     let SeqMap {
         prepend,
         append,
         delete,
+        exclude_subscription_rules,
     } = seq;
+
+    // 仅规则字段支持完全排除订阅规则
+    let only_custom_rules = field == "rules" && exclude_subscription_rules;
 
     let added_proxy_names = if field == "proxies" {
         let mut names = collect_proxy_names(&prepend);
@@ -54,26 +74,37 @@ pub fn use_seq(seq: SeqMap, mut config: Mapping, field: &str) -> Mapping {
 
     if let Some(Value::Sequence(existing_items)) = config.remove(field) {
         // Filter out deleted items
-        let kept_items: Sequence = existing_items
-            .into_iter()
-            .filter(|item| {
-                if let Value::String(s) = item {
-                    !delete.contains(s)
-                } else if let Value::Mapping(m) = item {
-                    if let Some(Value::String(name)) = m.get("name") {
-                        !delete.contains(name)
+        let kept_items: Sequence = if only_custom_rules {
+            // 订阅规则整体丢弃
+            Sequence::new()
+        } else {
+            existing_items
+                .into_iter()
+                .filter(|item| {
+                    if let Value::String(s) = item {
+                        !delete.contains(s)
+                    } else if let Value::Mapping(m) = item {
+                        if let Some(Value::String(name)) = m.get("name") {
+                            !delete.contains(name)
+                        } else {
+                            true
+                        }
                     } else {
                         true
                     }
-                } else {
-                    true
-                }
-            })
-            .collect();
+                })
+                .collect()
+        };
         updated_items.extend(kept_items);
     }
 
     updated_items.extend(append);
+
+    // 未命中的请求一律直连
+    if only_custom_rules && !has_match_rule(&updated_items) {
+        updated_items.push(Value::String("MATCH,DIRECT".into()));
+    }
+
     config.insert(Value::String(field.into()), Value::Sequence(updated_items));
 
     if field != "proxies" {
@@ -181,6 +212,7 @@ proxy-groups:
             prepend: Sequence::new(),
             append: Sequence::new(),
             delete: vec!["proxy1".to_string()],
+            ..SeqMap::default()
         };
 
         config = use_seq(seq, config, "proxies");
@@ -272,6 +304,7 @@ proxy-groups:
             prepend,
             append,
             delete: vec![],
+            ..SeqMap::default()
         };
 
         config = use_seq(seq, config, "proxies");
@@ -318,10 +351,135 @@ proxy-groups: "invalid"
             prepend: Sequence::new(),
             append: Sequence::new(),
             delete: vec!["proxy1".to_string()],
+            ..SeqMap::default()
         };
 
         config = use_seq(seq, config, "proxies");
 
         assert_eq!(config.get("proxy-groups").and_then(Value::as_str), Some("invalid"));
+    }
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    #[allow(clippy::expect_used)]
+    fn test_exclude_subscription_rules_keeps_custom_rules_only() {
+        let config_str = r#"
+rules:
+- "DOMAIN,subscription.example.com,PROXY"
+- "DOMAIN,another.example.com,PROXY"
+rule-providers:
+  sample:
+    type: "http"
+"#;
+        let mut config: Mapping = serde_yaml_ng::from_str(config_str).expect("Failed to parse test config YAML");
+
+        let prepend: Sequence = serde_yaml_ng::from_str(
+            r#"
+- "DOMAIN,keep.example.com,PROXY"
+"#,
+        )
+        .expect("Failed to parse prepend rules");
+
+        let append: Sequence = serde_yaml_ng::from_str(
+            r#"
+- "DOMAIN,last.example.com,DIRECT"
+"#,
+        )
+        .expect("Failed to parse append rules");
+
+        let seq = SeqMap {
+            prepend,
+            append,
+            delete: vec!["DOMAIN,another.example.com,PROXY".to_string()],
+            exclude_subscription_rules: true,
+        };
+
+        config = use_seq(seq, config, "rules");
+
+        let rules: Vec<&str> = config
+            .get("rules")
+            .expect("rules field should exist")
+            .as_sequence()
+            .expect("rules should be a sequence")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+
+        assert_eq!(
+            rules,
+            vec![
+                "DOMAIN,keep.example.com,PROXY",
+                "DOMAIN,last.example.com,DIRECT",
+                "MATCH,DIRECT"
+            ]
+        );
+        assert!(config.contains_key("rule-providers"));
+    }
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    #[allow(clippy::expect_used)]
+    fn test_exclude_subscription_rules_respects_custom_match_rule() {
+        let config_str = r#"
+rules:
+- "DOMAIN,subscription.example.com,PROXY"
+"#;
+        let mut config: Mapping = serde_yaml_ng::from_str(config_str).expect("Failed to parse test config YAML");
+
+        let append: Sequence = serde_yaml_ng::from_str(
+            r#"
+- "MATCH,🐟 漏网之鱼"
+"#,
+        )
+        .expect("Failed to parse append rules");
+
+        let seq = SeqMap {
+            prepend: Sequence::new(),
+            append,
+            delete: Vec::new(),
+            exclude_subscription_rules: true,
+        };
+
+        config = use_seq(seq, config, "rules");
+
+        let rules: Vec<&str> = config
+            .get("rules")
+            .expect("rules field should exist")
+            .as_sequence()
+            .expect("rules should be a sequence")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+
+        assert_eq!(rules, vec!["MATCH,🐟 漏网之鱼"]);
+    }
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    #[allow(clippy::expect_used)]
+    fn test_exclude_subscription_rules_ignored_by_other_fields() {
+        let config_str = r#"
+proxies:
+- name: "proxy1"
+  type: "ss"
+"#;
+        let mut config: Mapping = serde_yaml_ng::from_str(config_str).expect("Failed to parse test config YAML");
+
+        let seq = SeqMap {
+            prepend: Sequence::new(),
+            append: Sequence::new(),
+            delete: Vec::new(),
+            exclude_subscription_rules: true,
+        };
+
+        config = use_seq(seq, config, "proxies");
+
+        let proxies = config
+            .get("proxies")
+            .expect("proxies field should exist")
+            .as_sequence()
+            .expect("proxies should be a sequence");
+
+        assert_eq!(proxies.len(), 1);
     }
 }
