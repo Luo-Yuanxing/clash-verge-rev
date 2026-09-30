@@ -28,6 +28,8 @@ import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { MonacoEditorInstance } from '@/types/monaco'
 import { MONACO_FONT_FAMILY } from '@/utils/font-family'
+import getSystem from '@/utils/get-system'
+import { isValidIpCidr } from '@/utils/network'
 import { parseYamlSafe } from '@/utils/yaml'
 
 import {
@@ -39,9 +41,7 @@ import {
   builtinProxyPolicies,
   normalizeDomainSuffix,
   PROXY_POLICY_LABEL_KEYS,
-  RULE_TYPE_LABEL_KEYS,
   type RuleTypeOption,
-  ruleTypeOptions,
 } from './rule-fields'
 import { SeqRulesView } from './seq-rules-view'
 import { useSeqRuleConfig } from './use-seq-rule-config'
@@ -56,6 +56,101 @@ interface Props {
   onSave?: (prev?: string, curr?: string) => void
   readOnly?: boolean
 }
+
+const portValidator = (value: string): boolean =>
+  /^(?:[1-9]\d{0,3}|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5])$/.test(
+    value,
+  )
+
+/** 编辑器支持的全部规则类型，比自定义规则页的下拉更全 */
+const editorRuleTypes: RuleTypeOption[] = [
+  { name: 'DOMAIN', example: 'example.com' },
+  { name: 'DOMAIN-SUFFIX', example: 'example.com' },
+  { name: 'DOMAIN-KEYWORD', example: 'example' },
+  { name: 'DOMAIN-REGEX', example: 'example.*' },
+  { name: 'GEOSITE', example: 'youtube' },
+  { name: 'GEOIP', example: 'CN', noResolve: true },
+  { name: 'SRC-GEOIP', example: 'CN' },
+  {
+    name: 'IP-ASN',
+    example: '13335',
+    noResolve: true,
+    validator: (value) => !!+value,
+  },
+  { name: 'SRC-IP-ASN', example: '9808', validator: (value) => !!+value },
+  {
+    name: 'IP-CIDR',
+    example: '127.0.0.0/8',
+    noResolve: true,
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'IP-CIDR6',
+    example: '2620:0:2d0:200::7/32',
+    noResolve: true,
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'SRC-IP-CIDR',
+    example: '192.168.1.201/32',
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'IP-SUFFIX',
+    example: '8.8.8.8/24',
+    noResolve: true,
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'SRC-IP-SUFFIX',
+    example: '192.168.1.201/8',
+    validator: isValidIpCidr,
+  },
+  { name: 'SRC-PORT', example: '7777', validator: portValidator },
+  { name: 'DST-PORT', example: '80', validator: portValidator },
+  { name: 'IN-PORT', example: '7897', validator: portValidator },
+  { name: 'DSCP', example: '4' },
+  {
+    name: 'PROCESS-NAME',
+    example: getSystem() === 'windows' ? 'chrome.exe' : 'curl',
+  },
+  {
+    name: 'PROCESS-PATH',
+    example:
+      getSystem() === 'windows'
+        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+        : '/usr/bin/wget',
+  },
+  { name: 'PROCESS-NAME-REGEX', example: '.*telegram.*' },
+  {
+    name: 'PROCESS-PATH-REGEX',
+    example:
+      getSystem() === 'windows' ? '(?i).*Application\\chrome.*' : '.*bin/wget',
+  },
+  {
+    name: 'NETWORK',
+    example: 'udp',
+    validator: (value) => ['tcp', 'udp'].includes(value),
+  },
+  { name: 'UID', example: '1001', validator: (value) => !!+value },
+  { name: 'IN-TYPE', example: 'SOCKS/HTTP' },
+  { name: 'IN-USER', example: 'mihomo' },
+  { name: 'IN-NAME', example: 'ss' },
+  { name: 'SUB-RULE', example: '(NETWORK,tcp)' },
+  { name: 'RULE-SET', example: 'providername', noResolve: true },
+  { name: 'AND', example: '((DOMAIN,baidu.com),(NETWORK,UDP))' },
+  { name: 'OR', example: '((NETWORK,UDP),(DOMAIN,baidu.com))' },
+  { name: 'NOT', example: '((DOMAIN,baidu.com))' },
+  { name: 'MATCH', required: false },
+]
+
+/** 规则类型 → i18n 文案键 */
+const editorRuleTypeLabelKeys: Record<string, string> = Object.fromEntries(
+  editorRuleTypes.map((rule) => [
+    rule.name,
+    `rules.modals.editor.ruleTypes.${rule.name}`,
+  ]),
+)
 
 const findRealIndex = (
   list: string[],
@@ -102,7 +197,7 @@ export const RulesEditorViewer = (props: Props) => {
     resetContent,
   } = useSeqRuleConfig(property, open)
 
-  const [ruleType, setRuleType] = useState<RuleTypeOption>(ruleTypeOptions[0]!)
+  const [ruleType, setRuleType] = useState<RuleTypeOption>(editorRuleTypes[0]!)
   const [ruleContent, setRuleContent] = useState('')
   const [noResolve, setNoResolve] = useState(false)
   const [proxyPolicy, setProxyPolicy] = useState(builtinProxyPolicies[0])
@@ -382,15 +477,15 @@ export const RulesEditorViewer = (props: Props) => {
                     size="small"
                     sx={{ minWidth: '240px' }}
                     renderInput={(params) => <TextField {...params} />}
-                    options={ruleTypeOptions}
+                    options={editorRuleTypes}
                     value={ruleType}
                     getOptionLabel={(option) =>
-                      t(RULE_TYPE_LABEL_KEYS[option.name] ?? option.name)
+                      t(editorRuleTypeLabelKeys[option.name] ?? option.name)
                     }
                     renderOption={(props, option) => {
                       const { key, ...optionProps } = props
                       const label = t(
-                        RULE_TYPE_LABEL_KEYS[option.name] ?? option.name,
+                        editorRuleTypeLabelKeys[option.name] ?? option.name,
                       )
                       return (
                         <li key={key} {...optionProps} title={label}>

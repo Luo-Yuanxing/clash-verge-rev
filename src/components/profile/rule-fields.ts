@@ -1,6 +1,4 @@
 import type { TranslationKey } from '@/types/generated/i18n-keys'
-import getSystem from '@/utils/get-system'
-import { isValidIpCidr } from '@/utils/network'
 
 /** 规则字段拆分结果 */
 export interface ParsedRule {
@@ -199,13 +197,10 @@ export interface RuleTypeOption {
   validator?: (value: string) => boolean
 }
 
-const portValidator = (value: string): boolean => {
-  return new RegExp(
-    '^(?:[1-9]\\d{0,3}|[1-5]\\d{4}|6[0-4]\\d{3}|65[0-4]\\d{2}|655[0-2]\\d|6553[0-5])$',
-  ).test(value)
-}
-
-/** 全部规则类型选项，编辑器与自定义规则页共用 */
+/**
+ * 规则类型选项，编辑器与自定义规则页共用；
+ * 自定义规则页的编辑下拉只保留域名类规则，其余类型仍可由编辑器写入。
+ */
 export const ruleTypeOptions: RuleTypeOption[] = [
   {
     name: 'DOMAIN',
@@ -222,144 +217,6 @@ export const ruleTypeOptions: RuleTypeOption[] = [
   {
     name: 'DOMAIN-REGEX',
     example: 'example.*',
-  },
-  {
-    name: 'GEOSITE',
-    example: 'youtube',
-  },
-  {
-    name: 'GEOIP',
-    example: 'CN',
-    noResolve: true,
-  },
-  {
-    name: 'SRC-GEOIP',
-    example: 'CN',
-  },
-  {
-    name: 'IP-ASN',
-    example: '13335',
-    noResolve: true,
-    validator: (value) => (+value ? true : false),
-  },
-  {
-    name: 'SRC-IP-ASN',
-    example: '9808',
-    validator: (value) => (+value ? true : false),
-  },
-  {
-    name: 'IP-CIDR',
-    example: '127.0.0.0/8',
-    noResolve: true,
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'IP-CIDR6',
-    example: '2620:0:2d0:200::7/32',
-    noResolve: true,
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'SRC-IP-CIDR',
-    example: '192.168.1.201/32',
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'IP-SUFFIX',
-    example: '8.8.8.8/24',
-    noResolve: true,
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'SRC-IP-SUFFIX',
-    example: '192.168.1.201/8',
-    validator: isValidIpCidr,
-  },
-  {
-    name: 'SRC-PORT',
-    example: '7777',
-    validator: (value) => portValidator(value),
-  },
-  {
-    name: 'DST-PORT',
-    example: '80',
-    validator: (value) => portValidator(value),
-  },
-  {
-    name: 'IN-PORT',
-    example: '7897',
-    validator: (value) => portValidator(value),
-  },
-  {
-    name: 'DSCP',
-    example: '4',
-  },
-  {
-    name: 'PROCESS-NAME',
-    example: getSystem() === 'windows' ? 'chrome.exe' : 'curl',
-  },
-  {
-    name: 'PROCESS-PATH',
-    example:
-      getSystem() === 'windows'
-        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-        : '/usr/bin/wget',
-  },
-  {
-    name: 'PROCESS-NAME-REGEX',
-    example: '.*telegram.*',
-  },
-  {
-    name: 'PROCESS-PATH-REGEX',
-    example:
-      getSystem() === 'windows' ? '(?i).*Application\\chrome.*' : '.*bin/wget',
-  },
-  {
-    name: 'NETWORK',
-    example: 'udp',
-    validator: (value) => ['tcp', 'udp'].includes(value),
-  },
-  {
-    name: 'UID',
-    example: '1001',
-    validator: (value) => (+value ? true : false),
-  },
-  {
-    name: 'IN-TYPE',
-    example: 'SOCKS/HTTP',
-  },
-  {
-    name: 'IN-USER',
-    example: 'mihomo',
-  },
-  {
-    name: 'IN-NAME',
-    example: 'ss',
-  },
-  {
-    name: 'SUB-RULE',
-    example: '(NETWORK,tcp)',
-  },
-  {
-    name: 'RULE-SET',
-    example: 'providername',
-    noResolve: true,
-  },
-  {
-    name: 'AND',
-    example: '((DOMAIN,baidu.com),(NETWORK,UDP))',
-  },
-  {
-    name: 'OR',
-    example: '((NETWORK,UDP),(DOMAIN,baidu.com))',
-  },
-  {
-    name: 'NOT',
-    example: '((DOMAIN,baidu.com))',
-  },
-  {
-    name: 'MATCH',
-    required: false,
   },
 ]
 
