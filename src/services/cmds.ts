@@ -357,10 +357,6 @@ export async function getNetworkInterfacesInfo() {
   return invoke<INetworkInterface[]>('get_network_interfaces_info')
 }
 
-export async function getSystemConnections() {
-  return invoke<ISystemConnections>('get_system_connections')
-}
-
 export async function createWebdavBackup() {
   return invoke<void>('create_webdav_backup')
 }

@@ -203,28 +203,6 @@ interface IConnections {
   connections: IConnectionsItem[]
 }
 
-/** One row of the OS socket table, as reported by `get_system_connections`. */
-interface ISystemConnectionsItem {
-  pid: number
-  /** Executable name, empty when the toolhelp snapshot did not resolve the process id. */
-  process: string
-  protocol: 'tcp' | 'udp'
-  family: 'ipv4' | 'ipv6'
-  localAddress: string
-  localPort: number
-  /** `*` for UDP rows, which have no peer. */
-  remoteAddress: string
-  remotePort: number
-  /** TCP state name, `-` for UDP rows. */
-  state: string
-}
-
-interface ISystemConnections {
-  connections: ISystemConnectionsItem[]
-  /** Tables that could not be read, formatted `"<protocol>/<family>: <reason>"`. */
-  unavailable: string[]
-}
-
 interface IConnectionSetting {
   layout: 'table' | 'list'
   /** Rolling window of the connection history, in milliseconds */
