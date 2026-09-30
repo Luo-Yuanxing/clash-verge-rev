@@ -1,3 +1,7 @@
+import type { TranslationKey } from '@/types/generated/i18n-keys'
+import getSystem from '@/utils/get-system'
+import { isValidIpCidr } from '@/utils/network'
+
 /** 规则字段拆分结果 */
 export interface ParsedRule {
   /** 规则类型，如 DOMAIN-SUFFIX */
@@ -6,6 +10,14 @@ export interface ParsedRule {
   host: string
   /** 代理策略 */
   policy: string
+}
+
+/** no-resolve 修饰：只出现在规则末尾，编辑时需原样保留 */
+const NO_RESOLVE_SUFFIX = ',no-resolve'
+
+/** 规则的全部可编辑字段，比 ParsedRule 多带 no-resolve 标记 */
+export interface RuleParts extends ParsedRule {
+  noResolve: boolean
 }
 
 /** 按 `类型,条件,策略` 拆分规则字符串（忽略 no-resolve 修饰） */
@@ -17,6 +29,47 @@ export const parseRule = (ruleRaw: string): ParsedRule => {
   const host = rule.slice(type.length + 1, -policy.length - 1)
 
   return { type, host, policy }
+}
+
+/**
+ * 拆分规则的三个字段并单独识别 no-resolve；
+ * 条件部分内部的逗号（AND、SUB-RULE 等嵌套规则）原样保留。
+ */
+export const parseRuleParts = (ruleRaw: string): RuleParts => {
+  const hasNoResolve = ruleRaw.endsWith(NO_RESOLVE_SUFFIX)
+  const rule = hasNoResolve
+    ? ruleRaw.slice(0, -NO_RESOLVE_SUFFIX.length)
+    : ruleRaw
+
+  const typeEnd = rule.indexOf(',')
+  if (typeEnd < 0)
+    return { type: rule, host: '', policy: '', noResolve: hasNoResolve }
+
+  const policyStart = rule.lastIndexOf(',')
+  // 只有 `类型,策略` 两段时条件为空，条件内部的逗号不会被当作分隔符
+  const hasHost = policyStart > typeEnd
+
+  return {
+    type: rule.slice(0, typeEnd),
+    host: hasHost ? rule.slice(typeEnd + 1, policyStart) : '',
+    policy: hasHost ? rule.slice(policyStart + 1) : rule.slice(typeEnd + 1),
+    noResolve: hasNoResolve,
+  }
+}
+
+/**
+ * 按 `类型,条件,策略` 拼回规则字符串；
+ * DOMAIN-SUFFIX 的条件先归一化到两级域名（与规则编辑器一致），
+ * 条件为空的规则（MATCH 等）不写多余逗号，no-resolve 按需追加。
+ */
+export const serializeRuleParts = (parts: RuleParts): string => {
+  const host = parts.host.trim()
+  const condition =
+    parts.type === 'DOMAIN-SUFFIX' ? normalizeDomainSuffix(host) : host
+
+  return `${parts.type},${condition ? `${condition},` : ''}${parts.policy}${
+    parts.noResolve ? NO_RESOLVE_SUFFIX : ''
+  }`
 }
 
 /** 只有域名类规则能判断主机名是否已命中 */
@@ -135,6 +188,202 @@ export const normalizeDomainSuffix = (value: string): string => {
   const keep = MULTI_LEVEL_SUFFIXES.has(labels.slice(-2).join('.')) ? 3 : 2
   return labels.slice(-keep).join('.')
 }
+
+/** 规则类型选项：name 即写入规则的字符串，noResolve 表示支持 no-resolve */
+export interface RuleTypeOption {
+  name: string
+  required?: boolean
+  /** 条件为空的规则（MATCH 等）不写占位符 */
+  example?: string
+  noResolve?: boolean
+  validator?: (value: string) => boolean
+}
+
+const portValidator = (value: string): boolean => {
+  return new RegExp(
+    '^(?:[1-9]\\d{0,3}|[1-5]\\d{4}|6[0-4]\\d{3}|65[0-4]\\d{2}|655[0-2]\\d|6553[0-5])$',
+  ).test(value)
+}
+
+/** 全部规则类型选项，编辑器与自定义规则页共用 */
+export const ruleTypeOptions: RuleTypeOption[] = [
+  {
+    name: 'DOMAIN',
+    example: 'example.com',
+  },
+  {
+    name: 'DOMAIN-SUFFIX',
+    example: 'example.com',
+  },
+  {
+    name: 'DOMAIN-KEYWORD',
+    example: 'example',
+  },
+  {
+    name: 'DOMAIN-REGEX',
+    example: 'example.*',
+  },
+  {
+    name: 'GEOSITE',
+    example: 'youtube',
+  },
+  {
+    name: 'GEOIP',
+    example: 'CN',
+    noResolve: true,
+  },
+  {
+    name: 'SRC-GEOIP',
+    example: 'CN',
+  },
+  {
+    name: 'IP-ASN',
+    example: '13335',
+    noResolve: true,
+    validator: (value) => (+value ? true : false),
+  },
+  {
+    name: 'SRC-IP-ASN',
+    example: '9808',
+    validator: (value) => (+value ? true : false),
+  },
+  {
+    name: 'IP-CIDR',
+    example: '127.0.0.0/8',
+    noResolve: true,
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'IP-CIDR6',
+    example: '2620:0:2d0:200::7/32',
+    noResolve: true,
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'SRC-IP-CIDR',
+    example: '192.168.1.201/32',
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'IP-SUFFIX',
+    example: '8.8.8.8/24',
+    noResolve: true,
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'SRC-IP-SUFFIX',
+    example: '192.168.1.201/8',
+    validator: isValidIpCidr,
+  },
+  {
+    name: 'SRC-PORT',
+    example: '7777',
+    validator: (value) => portValidator(value),
+  },
+  {
+    name: 'DST-PORT',
+    example: '80',
+    validator: (value) => portValidator(value),
+  },
+  {
+    name: 'IN-PORT',
+    example: '7897',
+    validator: (value) => portValidator(value),
+  },
+  {
+    name: 'DSCP',
+    example: '4',
+  },
+  {
+    name: 'PROCESS-NAME',
+    example: getSystem() === 'windows' ? 'chrome.exe' : 'curl',
+  },
+  {
+    name: 'PROCESS-PATH',
+    example:
+      getSystem() === 'windows'
+        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+        : '/usr/bin/wget',
+  },
+  {
+    name: 'PROCESS-NAME-REGEX',
+    example: '.*telegram.*',
+  },
+  {
+    name: 'PROCESS-PATH-REGEX',
+    example:
+      getSystem() === 'windows' ? '(?i).*Application\\chrome.*' : '.*bin/wget',
+  },
+  {
+    name: 'NETWORK',
+    example: 'udp',
+    validator: (value) => ['tcp', 'udp'].includes(value),
+  },
+  {
+    name: 'UID',
+    example: '1001',
+    validator: (value) => (+value ? true : false),
+  },
+  {
+    name: 'IN-TYPE',
+    example: 'SOCKS/HTTP',
+  },
+  {
+    name: 'IN-USER',
+    example: 'mihomo',
+  },
+  {
+    name: 'IN-NAME',
+    example: 'ss',
+  },
+  {
+    name: 'SUB-RULE',
+    example: '(NETWORK,tcp)',
+  },
+  {
+    name: 'RULE-SET',
+    example: 'providername',
+    noResolve: true,
+  },
+  {
+    name: 'AND',
+    example: '((DOMAIN,baidu.com),(NETWORK,UDP))',
+  },
+  {
+    name: 'OR',
+    example: '((NETWORK,UDP),(DOMAIN,baidu.com))',
+  },
+  {
+    name: 'NOT',
+    example: '((DOMAIN,baidu.com))',
+  },
+  {
+    name: 'MATCH',
+    required: false,
+  },
+]
+
+/** 规则类型 → i18n 文案键 */
+export const RULE_TYPE_LABEL_KEYS: Record<string, string> = Object.fromEntries(
+  ruleTypeOptions.map((rule) => [
+    rule.name,
+    `rules.modals.editor.ruleTypes.${rule.name}`,
+  ]),
+)
+
+/** 内置代理策略，排在策略列表最前 */
+export const builtinProxyPolicies = ['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']
+
+/** 内置代理策略 → i18n 文案键 */
+export const PROXY_POLICY_LABEL_KEYS: Record<string, TranslationKey> =
+  builtinProxyPolicies.reduce(
+    (acc, policy) => {
+      acc[policy] =
+        `proxies.components.enums.policies.${policy}` as TranslationKey
+      return acc
+    },
+    {} as Record<string, TranslationKey>,
+  )
 
 /** 把 from 位置的元素移动到 to 位置，返回新数组 */
 export const moveItem = <T>(list: T[], from: number, to: number): T[] => {
