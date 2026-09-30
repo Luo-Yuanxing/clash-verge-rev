@@ -4,7 +4,6 @@
       "updateAll": "Update All Profiles",
       "viewRuntimeConfig": "View Runtime Config",
       "reactivate": "Reactivate Profiles",
-      "quickConfig": "Quick Export / Import Config",
       "import": "Import"
     },
     "batch": {
@@ -24,6 +23,26 @@
       "placeholder": "Profile URL",
       "actions": {
         "paste": "Paste"
+      }
+    },
+    "quickConfig": {
+      "scope": {
+        "all": "All",
+        "allHint": "Export app settings plus the custom rules of the active profile",
+        "justRule": "Rules only",
+        "justRuleHint": "Export only the custom rules of the active profile"
+      },
+      "placeholder": "Base64 config (share the generated value, or paste someone else's)",
+      "export": "Export",
+      "import": "Import",
+      "feedback": {
+        "exported": "Generated and copied to clipboard",
+        "imported": "Import finished, new profile: {{name}}",
+        "importedSettingsOnly": "Import finished",
+        "invalid": "Not a valid quick config",
+        "profileFailed": "Failed to create profile",
+        "rulesFailed": "Failed to write custom rules",
+        "failed": "Operation failed"
       }
     },
     "feedback": {
@@ -217,33 +236,6 @@
     },
     "qrViewer": {
       "title": "Subscription QR Code"
-    },
-    "quickConfig": {
-      "title": "Quick Export / Import Config",
-      "scope": {
-        "label": "Export scope",
-        "all": "All (settings + custom rules)",
-        "justRule": "Custom rules only"
-      },
-      "export": {
-        "action": "Generate",
-        "copy": "Copy"
-      },
-      "import": {
-        "action": "Import",
-        "placeholder": "Paste a Base64 config"
-      },
-      "hint": "Exported as Base64 of JSON (unencrypted); it only takes the custom rules of the active profile and contains no subscription information. Importing creates a profile named after the first 8 Base64 characters and attaches the custom rules to it.",
-      "feedback": {
-        "exported": "Generated and copied to clipboard",
-        "copied": "Copied to clipboard",
-        "imported": "Import finished, new profile: {{name}}",
-        "importedSettingsOnly": "Import finished",
-        "invalid": "Not a valid quick config",
-        "profileFailed": "Failed to create profile",
-        "rulesFailed": "Failed to write custom rules",
-        "failed": "Operation failed"
-      }
     }
   }
 }

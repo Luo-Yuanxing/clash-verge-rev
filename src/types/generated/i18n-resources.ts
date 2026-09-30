@@ -469,38 +469,10 @@ export interface TranslationResources {
         qrViewer: {
           title: string
         }
-        quickConfig: {
-          export: {
-            action: string
-            copy: string
-          }
-          feedback: {
-            copied: string
-            exported: string
-            failed: string
-            imported: string
-            importedSettingsOnly: string
-            invalid: string
-            profileFailed: string
-            rulesFailed: string
-          }
-          hint: string
-          import: {
-            action: string
-            placeholder: string
-          }
-          scope: {
-            all: string
-            justRule: string
-            label: string
-          }
-          title: string
-        }
       }
       page: {
         actions: {
           import: string
-          quickConfig: string
           reactivate: string
           updateAll: string
           viewRuntimeConfig: string
@@ -556,6 +528,26 @@ export interface TranslationResources {
             paste: string
           }
           placeholder: string
+        }
+        quickConfig: {
+          export: string
+          feedback: {
+            exported: string
+            failed: string
+            imported: string
+            importedSettingsOnly: string
+            invalid: string
+            profileFailed: string
+            rulesFailed: string
+          }
+          import: string
+          placeholder: string
+          scope: {
+            all: string
+            allHint: string
+            justRule: string
+            justRuleHint: string
+          }
         }
         title: string
       }
