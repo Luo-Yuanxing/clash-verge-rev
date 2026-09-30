@@ -67,7 +67,9 @@ export interface TranslationResources {
           more: string
           notifications: {
             created: string
+            createdForProfile: string
             duplicated: string
+            pending: string
           }
           policies: {
             PROXY: string
@@ -669,6 +671,11 @@ export interface TranslationResources {
           excludeSubscription: {
             hint: string
             label: string
+          }
+          feedback: {
+            pending: string
+            saved: string
+            savedForProfile: string
           }
           order: {
             byDomain: string

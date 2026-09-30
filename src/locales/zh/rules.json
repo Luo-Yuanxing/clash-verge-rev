@@ -22,6 +22,11 @@
       "actions": {
         "save": "保存"
       },
+      "feedback": {
+        "saved": "规则已保存，内核已重新加载配置",
+        "savedForProfile": "规则已保存到 {{name}}，切换到该订阅后生效",
+        "pending": "规则已保存，但配置更新被占用，请稍后重试"
+      },
       "order": {
         "byDomain": "按域名层级排序",
         "original": "显示原始顺序"
