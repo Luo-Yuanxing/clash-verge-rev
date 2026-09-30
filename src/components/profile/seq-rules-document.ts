@@ -50,3 +50,24 @@ export const serializeSeqRules = (config: SeqRulesConfig): string =>
     },
     { forceQuotes: true },
   )
+
+/**
+ * 依次检查候选订阅的规则文件，返回第一个有自定义规则（prepend/append 非空）的 uid；
+ * 读取失败按空处理，全部为空时返回空串。
+ */
+export const findFirstNonEmptyRulesUid = async (
+  candidates: { uid: string; property: string }[],
+  read: (property: string) => Promise<SeqRulesDocument> = readSeqRulesDocument,
+): Promise<string> => {
+  for (const { uid, property } of candidates) {
+    try {
+      const { config } = await read(property)
+      const { prepend, append } = toSeqConfig(config)
+      if (prepend.length > 0 || append.length > 0) return uid
+    } catch {
+      // 读取失败按空处理，继续看下一个订阅
+    }
+  }
+
+  return ''
+}
