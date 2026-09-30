@@ -19,6 +19,9 @@
         "enabled": "显示启用",
         "disabled": "显示关闭"
       },
+      "actions": {
+        "save": "保存"
+      },
       "order": {
         "byDomain": "按域名层级排序",
         "original": "显示原始顺序"

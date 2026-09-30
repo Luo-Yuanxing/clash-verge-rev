@@ -19,6 +19,9 @@
         "enabled": "Show enabled",
         "disabled": "Show disabled"
       },
+      "actions": {
+        "save": "Save"
+      },
       "order": {
         "byDomain": "Sort by domain level",
         "original": "Show original order"

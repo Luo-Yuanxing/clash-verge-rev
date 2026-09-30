@@ -75,6 +75,78 @@ export const serializeSeqRules = (config: SeqRulesConfig): string => {
   )
 }
 
+/** 自定义规则所在的序列 */
+export type SeqRuleSource = 'prepend' | 'append'
+
+/** 一条自定义规则及其启用状态 */
+export interface SeqRuleRef {
+  rule: string
+  source: SeqRuleSource
+  enabled: boolean
+}
+
+/**
+ * 勾选即启用：关闭的规则移出 prepend/append 并记入 disabled，
+ * 重新启用的规则从 disabled 移回原序列末尾。
+ */
+export const applyRuleEnabled = (
+  config: SeqRulesConfig,
+  targets: SeqRuleRef[],
+  enabled: boolean,
+): SeqRulesConfig => {
+  const prepend = [...config.prepend]
+  const append = [...config.append]
+  const disabled = {
+    prepend: [...config.disabled.prepend],
+    append: [...config.disabled.append],
+  }
+
+  for (const { rule, source } of targets) {
+    const sequence = source === 'prepend' ? prepend : append
+    const closed = source === 'prepend' ? disabled.prepend : disabled.append
+
+    if (enabled) {
+      const index = closed.indexOf(rule)
+      if (index >= 0) closed.splice(index, 1)
+      if (!sequence.includes(rule)) sequence.push(rule)
+    } else {
+      for (let i = sequence.length - 1; i >= 0; i -= 1) {
+        if (sequence[i] === rule) sequence.splice(i, 1)
+      }
+      if (!closed.includes(rule)) closed.push(rule)
+    }
+  }
+
+  return { ...config, prepend, append, disabled }
+}
+
+/** 删除一条自定义规则：启用中的从序列移除，已关闭的从 disabled 移除 */
+export const removeSeqRule = (
+  config: SeqRulesConfig,
+  { rule, source, enabled }: SeqRuleRef,
+): SeqRulesConfig => {
+  const drop = (list: string[]) => list.filter((item) => item !== rule)
+
+  if (source === 'prepend') {
+    return enabled
+      ? { ...config, prepend: drop(config.prepend) }
+      : {
+          ...config,
+          disabled: {
+            ...config.disabled,
+            prepend: drop(config.disabled.prepend),
+          },
+        }
+  }
+
+  return enabled
+    ? { ...config, append: drop(config.append) }
+    : {
+        ...config,
+        disabled: { ...config.disabled, append: drop(config.disabled.append) },
+      }
+}
+
 /**
  * 依次检查候选订阅的规则文件，返回第一个有自定义规则（prepend/append 非空）的 uid；
  * 读取失败按空处理，全部为空时返回空串。

@@ -20,18 +20,14 @@ import {
   type GroupedVirtualItem,
 } from './grouped-virtual-list'
 import { parseRule } from './rule-fields'
+import type { SeqRuleRef, SeqRuleSource } from './seq-rules-document'
 
-export type SeqRuleSource = 'prepend' | 'append'
+export type { SeqRuleSource }
 
 /** 列表筛选视图：全部 / 只看启用 / 只看已关闭 */
 export type SeqRuleVisibility = 'all' | 'enabled' | 'disabled'
 
-export interface SeqRuleRow {
-  rule: string
-  source: SeqRuleSource
-  /** 勾选即启用；关闭的规则只保留在文件里，不参与匹配 */
-  enabled: boolean
-}
+export type SeqRuleRow = SeqRuleRef
 
 interface Props {
   rows: SeqRuleRow[]

@@ -643,6 +643,9 @@ export interface TranslationResources {
     rules: {
       custom: {
         page: {
+          actions: {
+            save: string
+          }
           columns: {
             host: string
             policy: string

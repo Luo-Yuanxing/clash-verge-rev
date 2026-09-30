@@ -381,6 +381,7 @@ export const translationKeys = [
   'rules.custom.page.visibility.all',
   'rules.custom.page.visibility.enabled',
   'rules.custom.page.visibility.disabled',
+  'rules.custom.page.actions.save',
   'rules.custom.page.order.byDomain',
   'rules.custom.page.order.original',
   'rules.page.provider.trigger',

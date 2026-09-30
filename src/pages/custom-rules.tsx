@@ -1,4 +1,4 @@
-import { SortRounded } from '@mui/icons-material'
+import { SaveRounded, SortRounded } from '@mui/icons-material'
 import { Box, Button, Chip, Typography } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import { useEffect, useMemo, useState } from 'react'
@@ -10,10 +10,11 @@ import {
   moveItem,
 } from '@/components/profile/rule-fields'
 import {
+  applyRuleEnabled,
   findFirstNonEmptyRulesUid,
-  readSeqRulesDocument,
+  removeSeqRule,
+  type SeqRulesConfig,
   serializeSeqRules,
-  toSeqConfig,
 } from '@/components/profile/seq-rules-document'
 import {
   type SeqRuleRow,
@@ -47,6 +48,8 @@ const CustomRulesPage = () => {
   const [order, setOrder] = useState<'domain' | 'original'>('domain')
   /** 列表默认显示全部规则，可切换到只看启用或只看已关闭的规则 */
   const [visibility, setVisibility] = useState<SeqRuleVisibility>('all')
+  /** 未保存改动的所属订阅：切换订阅后改动自动失效 */
+  const [dirtyUid, setDirtyUid] = useState('')
 
   useEffect(() => {
     void mutateProfiles()
@@ -82,6 +85,9 @@ const CustomRulesPage = () => {
 
   const selected = items.find((item) => item.uid === selectedUid)
 
+  /** 当前订阅存在未保存的勾选改动 */
+  const dirty = !!selectedUid && dirtyUid === selectedUid
+
   const {
     visualization,
     match,
@@ -90,6 +96,8 @@ const CustomRulesPage = () => {
     setPrependSeq,
     appendSeq,
     setAppendSeq,
+    deleteSeq,
+    setDeleteSeq,
     disabledSeq,
     setDisabledSeq,
     excludeSubscriptionRules,
@@ -137,185 +145,79 @@ const CustomRulesPage = () => {
     return [...matched].sort((a, b) => compareRulesByHostLevel(a.rule, b.rule))
   }, [rows, match, order, visibility])
 
-  /** 勾选即启用：关闭的规则移入 disabled，不再写进 prepend/append */
-  const handleToggleRules = useLockFn(
-    async (targets: SeqRuleRow[], enabled: boolean) => {
-      if (!rulesProperty || targets.length === 0) return
-
-      try {
-        const { config } = await readSeqRulesDocument(rulesProperty)
-        const current = toSeqConfig(config)
-        const nextPrepend = [...current.prepend]
-        const nextAppend = [...current.append]
-        const nextDisabled = {
-          prepend: [...current.disabled.prepend],
-          append: [...current.disabled.append],
-        }
-
-        for (const { rule, source } of targets) {
-          const sequence = source === 'prepend' ? nextPrepend : nextAppend
-          const closed =
-            source === 'prepend' ? nextDisabled.prepend : nextDisabled.append
-
-          if (enabled) {
-            const index = closed.indexOf(rule)
-            if (index >= 0) closed.splice(index, 1)
-            if (!sequence.includes(rule)) sequence.push(rule)
-          } else {
-            for (let i = sequence.length - 1; i >= 0; i -= 1) {
-              if (sequence[i] === rule) sequence.splice(i, 1)
-            }
-            if (!closed.includes(rule)) closed.push(rule)
-          }
-        }
-
-        const saved = await saveProfileFile(
-          rulesProperty,
-          serializeSeqRules({
-            ...current,
-            prepend: nextPrepend,
-            append: nextAppend,
-            disabled: nextDisabled,
-          }),
-        )
-
-        // 校验失败时后端已回滚并提示，这里保持原状
-        if (!saved) return
-
-        setPrependSeq(nextPrepend)
-        setAppendSeq(nextAppend)
-        setDisabledSeq(nextDisabled)
-      } catch (err: any) {
-        showNotice.error(err)
-      }
-    },
+  /** 本地草稿：勾选只改这里，点保存才写回文件 */
+  const draft = useMemo<SeqRulesConfig>(
+    () => ({
+      prepend: prependSeq,
+      append: appendSeq,
+      delete: deleteSeq,
+      disabled: disabledSeq,
+      excludeSubscriptionRules,
+    }),
+    [prependSeq, appendSeq, deleteSeq, disabledSeq, excludeSubscriptionRules],
   )
 
-  /** 删除单条自定义规则并写回文件 */
-  const handleDeleteRule = useLockFn(
-    async ({ rule, source, enabled }: SeqRuleRow) => {
-      if (!rulesProperty) return
+  /** 把草稿同步回本地状态 */
+  const applyDraft = (next: SeqRulesConfig) => {
+    setPrependSeq(next.prepend)
+    setAppendSeq(next.append)
+    setDeleteSeq(next.delete)
+    setDisabledSeq(next.disabled)
+    setExcludeSubscriptionRules(next.excludeSubscriptionRules)
+  }
 
-      try {
-        const { config } = await readSeqRulesDocument(rulesProperty)
-        const current = toSeqConfig(config)
-        const nextDisabled = {
-          prepend: [...current.disabled.prepend],
-          append: [...current.disabled.append],
-        }
-
-        let nextPrepend = current.prepend
-        let nextAppend = current.append
-
-        if (enabled) {
-          nextPrepend =
-            source === 'prepend'
-              ? current.prepend.filter((item) => item !== rule)
-              : current.prepend
-          nextAppend =
-            source === 'append'
-              ? current.append.filter((item) => item !== rule)
-              : current.append
-        } else if (source === 'prepend') {
-          nextDisabled.prepend = nextDisabled.prepend.filter(
-            (item) => item !== rule,
-          )
-        } else {
-          nextDisabled.append = nextDisabled.append.filter(
-            (item) => item !== rule,
-          )
-        }
-
-        const saved = await saveProfileFile(
-          rulesProperty,
-          serializeSeqRules({
-            ...current,
-            prepend: nextPrepend,
-            append: nextAppend,
-            disabled: nextDisabled,
-          }),
-        )
-
-        // 校验失败时后端已回滚并提示
-        if (!saved) return
-
-        setPrependSeq(nextPrepend)
-        setAppendSeq(nextAppend)
-        setDisabledSeq(nextDisabled)
-      } catch (err: any) {
-        showNotice.error(err)
-      }
-    },
-  )
-
-  /** 拖动排序后立即写回文件 */
-  const handleReorderRule = useLockFn(
-    async (source: SeqRuleSource, from: number, to: number) => {
-      if (!rulesProperty) return
-
-      const list = source === 'prepend' ? prependSeq : appendSeq
-      const moved = moveItem(list, from, to)
-      const nextPrepend = source === 'prepend' ? moved : prependSeq
-      const nextAppend = source === 'append' ? moved : appendSeq
-
-      try {
-        const { config } = await readSeqRulesDocument(rulesProperty)
-        const current = toSeqConfig(config)
-
-        const saved = await saveProfileFile(
-          rulesProperty,
-          serializeSeqRules({
-            ...current,
-            prepend: nextPrepend,
-            append: nextAppend,
-          }),
-        )
-
-        // 校验失败时后端已回滚并提示，这里让列表回到文件里的顺序
-        if (!saved) {
-          setPrependSeq((prev) => [...prev])
-          return
-        }
-
-        setPrependSeq(nextPrepend)
-        setAppendSeq(nextAppend)
-      } catch (err: any) {
-        showNotice.error(err)
-      }
-    },
-  )
-
-  /** 开关即保存，写回后由后端校验并应用到运行时 */
-  const handleExcludeChange = useLockFn(async (next: boolean) => {
-    if (!rulesProperty) return
+  /** 写回文件；校验失败时后端已回滚并提示，本地草稿保持不变 */
+  const saveDraft = async (next: SeqRulesConfig) => {
+    if (!rulesProperty) return false
 
     try {
-      const { config } = await readSeqRulesDocument(rulesProperty)
-      const {
-        prepend,
-        append,
-        delete: deleteList,
-        disabled,
-      } = toSeqConfig(config)
+      if (!(await saveProfileFile(rulesProperty, serializeSeqRules(next)))) {
+        return false
+      }
 
-      const saved = await saveProfileFile(
-        rulesProperty,
-        serializeSeqRules({
-          prepend,
-          append,
-          delete: deleteList,
-          disabled,
-          excludeSubscriptionRules: next,
-        }),
-      )
-
-      // 校验失败时后端已回滚并提示，这里保持开关原状
-      if (!saved) return
-
-      setExcludeSubscriptionRules(next)
+      applyDraft(next)
+      setDirtyUid('')
+      return true
     } catch (err: any) {
       showNotice.error(err)
+      return false
     }
+  }
+
+  /** 勾选即启用：只改本地草稿，等保存按钮统一写回 */
+  const handleToggleRules = (targets: SeqRuleRow[], enabled: boolean) => {
+    if (targets.length === 0) return
+
+    applyDraft(applyRuleEnabled(draft, targets, enabled))
+    setDirtyUid(selectedUid)
+  }
+
+  /** 删除单条自定义规则，连同未保存的勾选改动一起写回 */
+  const handleDeleteRule = useLockFn(async (row: SeqRuleRow) => {
+    await saveDraft(removeSeqRule(draft, row))
+  })
+
+  /** 拖动排序后写回，未保存的勾选改动一并落盘 */
+  const handleReorderRule = useLockFn(
+    async (source: SeqRuleSource, from: number, to: number) => {
+      const list = source === 'prepend' ? prependSeq : appendSeq
+      const moved = moveItem(list, from, to)
+      const next: SeqRulesConfig = {
+        ...draft,
+        prepend: source === 'prepend' ? moved : prependSeq,
+        append: source === 'append' ? moved : appendSeq,
+      }
+
+      // 写回失败时让列表回到草稿顺序
+      if (!(await saveDraft(next))) {
+        setPrependSeq((prev) => [...prev])
+      }
+    },
+  )
+
+  /** 开关连同未保存的勾选改动一起写回 */
+  const handleExcludeChange = useLockFn(async (next: boolean) => {
+    await saveDraft({ ...draft, excludeSubscriptionRules: next })
   })
 
   return (
@@ -410,6 +312,18 @@ const CustomRulesPage = () => {
                   ? t('rules.custom.page.order.original')
                   : t('rules.custom.page.order.byDomain')}
               </Button>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={!dirty}
+                startIcon={<SaveRounded />}
+                sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                onClick={() => {
+                  void saveDraft(draft)
+                }}
+              >
+                {t('rules.custom.page.actions.save')}
+              </Button>
             </Box>
             <Box sx={{ height: 'calc(100% - 32px)', marginTop: '8px' }}>
               <SeqRulesTable
@@ -417,9 +331,7 @@ const CustomRulesPage = () => {
                 sortable={order === 'original'}
                 visibility={visibility}
                 onVisibilityChange={setVisibility}
-                onToggle={(targets, enabled) => {
-                  void handleToggleRules(targets, enabled)
-                }}
+                onToggle={handleToggleRules}
                 onDelete={(row) => {
                   void handleDeleteRule(row)
                 }}
