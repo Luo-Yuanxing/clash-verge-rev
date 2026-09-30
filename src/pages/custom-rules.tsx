@@ -1,12 +1,13 @@
 import { SortRounded } from '@mui/icons-material'
 import { Box, Button, Chip, Typography } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseEmpty, BasePage, BaseSearchBox, Switch } from '@/components/base'
 import { compareRulesByHostLevel } from '@/components/profile/rule-fields'
 import {
+  findFirstNonEmptyRulesUid,
   readSeqRulesDocument,
   serializeSeqRules,
   toSeqConfig,
@@ -45,33 +46,18 @@ const CustomRulesPage = () => {
   }, [mutateProfiles, pageVisible])
 
   // 进入页面时依次查看各订阅，跳过自定义规则为空的，直接选中第一个有内容的
-  const scannedRef = useRef('')
   useEffect(() => {
     if (!pageVisible || items.length === 0) return
 
-    const scanKey = items.map((item) => item.uid).join('|')
-    if (scannedRef.current === scanKey) return
-    scannedRef.current = scanKey
+    const candidates = items.flatMap((item) => {
+      const property = item.option?.rules
+      return property ? [{ uid: item.uid, property }] : []
+    })
 
     let cancelled = false
     void (async () => {
-      for (const item of items) {
-        const property = item.option?.rules
-        if (!property) continue
-
-        try {
-          const { config } = await readSeqRulesDocument(property)
-          const { prepend, append } = toSeqConfig(config)
-          if (prepend.length > 0 || append.length > 0) {
-            if (!cancelled) setAutoUid(item.uid)
-            return
-          }
-        } catch {
-          // 读取失败按空处理，继续看下一个订阅
-        }
-      }
-
-      if (!cancelled) setAutoUid('')
+      const uid = await findFirstNonEmptyRulesUid(candidates)
+      if (!cancelled) setAutoUid(uid)
     })()
 
     return () => {
