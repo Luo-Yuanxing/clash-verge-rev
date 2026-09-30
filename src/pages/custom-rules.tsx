@@ -15,6 +15,7 @@ import {
   removeSeqRule,
   type SeqRulesConfig,
   serializeSeqRules,
+  updateSeqRule,
 } from '@/components/profile/seq-rules-document'
 import {
   type SeqRuleRow,
@@ -209,6 +210,15 @@ const CustomRulesPage = () => {
     await saveDraft(removeSeqRule(draft, row))
   })
 
+  /** 编辑规则属性：原位置的规则改成新规则，重复的旧规则一并排除，只改本地草稿 */
+  const handleEditRule = (row: SeqRuleRow, nextRule: string) => {
+    const next = updateSeqRule(draft, row, nextRule)
+    if (next === draft) return
+
+    applyDraft(next)
+    setDirtyUid(selectedUid)
+  }
+
   /** 拖动排序后写回，未保存的勾选改动一并落盘 */
   const handleReorderRule = useLockFn(
     async (source: SeqRuleSource, from: number, to: number) => {
@@ -344,6 +354,7 @@ const CustomRulesPage = () => {
                 visibility={visibility}
                 onVisibilityChange={setVisibility}
                 onToggle={handleToggleRules}
+                onEdit={handleEditRule}
                 onDelete={(row) => {
                   void handleDeleteRule(row)
                 }}

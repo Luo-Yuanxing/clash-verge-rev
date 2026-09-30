@@ -4,11 +4,13 @@ import {
   FilterListRounded,
 } from '@mui/icons-material'
 import {
+  Autocomplete,
   Box,
   Checkbox,
   IconButton,
   Menu,
   MenuItem,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -19,7 +21,14 @@ import {
   GroupedVirtualList,
   type GroupedVirtualItem,
 } from './grouped-virtual-list'
-import { parseRule } from './rule-fields'
+import {
+  builtinProxyPolicies,
+  parseRuleParts,
+  PROXY_POLICY_LABEL_KEYS,
+  RULE_TYPE_LABEL_KEYS,
+  ruleTypeOptions,
+  serializeRuleParts,
+} from './rule-fields'
 import type { SeqRuleRef, SeqRuleSource } from './seq-rules-document'
 
 export type { SeqRuleSource }
@@ -42,6 +51,8 @@ interface Props {
   onToggle: (rows: SeqRuleRow[], enabled: boolean) => void
   onDelete: (row: SeqRuleRow) => void
   onReorder: (source: SeqRuleSource, from: number, to: number) => void
+  /** 主机 / 类型 / 策略改完后提交新规则串，重复项由调用方排除 */
+  onEdit: (row: SeqRuleRow, nextRule: string) => void
 }
 
 const ROW_HEIGHT = 40
@@ -67,6 +78,32 @@ const gridSx = (sortable?: boolean) =>
     px: 1,
   }) as const
 
+/** 单元格输入框统一成表格行高内的紧凑样式 */
+const cellFieldProps = {
+  variant: 'standard' as const,
+  margin: 'none' as const,
+  slotProps: {
+    input: {
+      disableUnderline: true,
+      sx: { fontSize: '0.875rem', py: 0.25 },
+    },
+  },
+}
+const cellAutocompleteProps = {
+  size: 'small' as const,
+  disableClearable: true,
+}
+
+/** 规则类型下拉选项：值是写入规则的字符串 */
+const ruleTypeNames = ruleTypeOptions.map((option) => option.name)
+
+/** 行内编辑草稿：三个属性各存一份，提交时合成新规则串 */
+interface RuleDraft {
+  type?: string
+  host?: string
+  policy?: string
+}
+
 /** 自定义规则表格：勾选即启用 / 主机 / 规则类型 / 代理策略 */
 export const SeqRulesTable = (props: Props) => {
   const {
@@ -77,10 +114,38 @@ export const SeqRulesTable = (props: Props) => {
     onToggle,
     onDelete,
     onReorder,
+    onEdit,
   } = props
   const { t } = useTranslation()
 
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null)
+  /** 正在编辑的行草稿，键为行 id；行消失后草稿自然失效 */
+  const [drafts, setDrafts] = useState<Record<string, RuleDraft>>({})
+
+  /** 编辑某一属性 */
+  const editDraft = (id: string, patch: RuleDraft) => {
+    setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
+  }
+
+  /**
+   * 提交整行：任何一项改动都当作一次编辑，未改动的属性沿用原值；
+   * 草稿先清掉再算结果，避免把这次提交过的草稿带进下一轮比较。
+   * 下拉选择会立刻提交，用 extra 传入刚选中的值，不必等重新渲染。
+   */
+  const commitDraft = (id: string, row: SeqRuleRow, extra?: RuleDraft) => {
+    const draft = extra ?? drafts[id]
+    setDrafts((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    if (!draft) return
+
+    // DOMAIN-SUFFIX 的域名归一化与 no-resolve 保留交给 serializeRuleParts
+    const next = serializeRuleParts({ ...parseRuleParts(row.rule), ...draft })
+    if (next && next !== row.rule) onEdit(row, next)
+  }
 
   const items = useMemo<GroupedVirtualItem<SeqRuleRow>[]>(
     () =>
@@ -102,7 +167,19 @@ export const SeqRulesTable = (props: Props) => {
 
   const renderItem = (entry: GroupedVirtualItem<SeqRuleRow>) => {
     const { rule, enabled } = entry.item
-    const { type, host, policy } = parseRule(rule)
+    const parts = parseRuleParts(rule)
+    const draft = drafts[entry.id] ?? {}
+    const { host, policy, type } = parts
+    /** 下拉只提供已知选项，策略列额外带上这一行当前的值 */
+    const policyOptions = builtinProxyPolicies.includes(policy)
+      ? builtinProxyPolicies
+      : [...builtinProxyPolicies, policy]
+    const selectedType: string | null = ruleTypeNames.includes(type)
+      ? type
+      : null
+    const selectedPolicy: string | null = policyOptions.includes(policy)
+      ? policy
+      : null
 
     return (
       <Box
@@ -138,19 +215,46 @@ export const SeqRulesTable = (props: Props) => {
           checked={enabled}
           onChange={() => onToggle([entry.item], !enabled)}
         />
-        <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-          {host || '-'}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {type}
-        </Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ wordBreak: 'break-word' }}
-        >
-          {policy}
-        </Typography>
+        <TextField
+          {...cellFieldProps}
+          value={draft.host ?? host}
+          placeholder="-"
+          onChange={(event) =>
+            editDraft(entry.id, { host: event.target.value })
+          }
+          onBlur={() => commitDraft(entry.id, entry.item)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur()
+          }}
+        />
+        <Autocomplete
+          {...cellAutocompleteProps}
+          options={ruleTypeNames}
+          value={selectedType}
+          getOptionLabel={(option) => t(RULE_TYPE_LABEL_KEYS[option] ?? option)}
+          renderInput={(params) => (
+            <TextField {...params} {...cellFieldProps} />
+          )}
+          onChange={(_, value) => {
+            commitDraft(entry.id, entry.item, { type: value ?? type })
+          }}
+          onBlur={() => commitDraft(entry.id, entry.item)}
+        />
+        <Autocomplete
+          {...cellAutocompleteProps}
+          options={policyOptions}
+          value={selectedPolicy}
+          getOptionLabel={(option) =>
+            t(PROXY_POLICY_LABEL_KEYS[option] ?? option)
+          }
+          renderInput={(params) => (
+            <TextField {...params} {...cellFieldProps} />
+          )}
+          onChange={(_, value) => {
+            commitDraft(entry.id, entry.item, { policy: value ?? policy })
+          }}
+          onBlur={() => commitDraft(entry.id, entry.item)}
+        />
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           {!sortable && (
             <IconButton size="small" onClick={() => onDelete(entry.item)}>
