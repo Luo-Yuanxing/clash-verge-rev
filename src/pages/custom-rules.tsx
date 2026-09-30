@@ -25,7 +25,7 @@ import {
 import { useSeqRuleConfig } from '@/components/profile/use-seq-rule-config'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVisibility } from '@/hooks/use-visibility'
-import { saveProfileFile } from '@/services/cmds'
+import { restartCore, saveProfileFile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
 const CustomRulesPage = () => {
@@ -185,6 +185,10 @@ const CustomRulesPage = () => {
       applyDraft(next)
       setSavedSeq(next)
       setDirtyUid('')
+
+      // 规则已写盘，但只有重启内核后才会被采用
+      await restartCore().catch((err) => showNotice.error(err))
+
       return true
     } catch (err: any) {
       showNotice.error(err)
