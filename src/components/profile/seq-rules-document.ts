@@ -128,6 +128,55 @@ export const applyRuleEnabled = (
   return { ...config, prepend, append, disabled }
 }
 
+/**
+ * 修改一条自定义规则的属性（主机 / 类型 / 策略）：原位置的旧字符串替换为新字符串，
+ * 原有字符串在别处（含另一序列、已关闭列表）的副本一并移除，避免编辑后出现重复规则；
+ * 新字符串与旧字符串相同则原样返回。
+ */
+export const updateSeqRule = (
+  config: SeqRulesConfig,
+  { rule, source, enabled }: SeqRuleRef,
+  nextRule: string,
+): SeqRulesConfig => {
+  if (rule === nextRule) return config
+
+  /** 去掉旧字符串与同名新字符串的所有副本 */
+  const drop = (list: string[]) =>
+    list.includes(rule) || list.includes(nextRule)
+      ? list.filter((item) => item !== rule && item !== nextRule)
+      : list
+
+  /**
+   * 编辑启用中的规则：它在哪个序列，就在哪个序列原位改名，
+   * 另一个序列与已关闭列表里的同名 / 旧名副本直接删除。
+   * 编辑已关闭的规则：改名只发生在它所在的已关闭列表，序列里的同名副本删除。
+   */
+  const update = (list: string[], isSelf: boolean): string[] => {
+    const index = list.indexOf(rule)
+    const cleaned = drop(list)
+    if (!isSelf) return cleaned
+    if (index < 0) return [...cleaned, nextRule]
+
+    // 先记下旧位置再删，删完把新规则插回同一位置
+    const next = [...cleaned]
+    next.splice(Math.min(index, next.length), 0, nextRule)
+    return next
+  }
+
+  return {
+    ...config,
+    prepend: update(config.prepend, enabled && source === 'prepend'),
+    append: update(config.append, enabled && source === 'append'),
+    disabled: {
+      prepend: update(
+        config.disabled.prepend,
+        !enabled && source === 'prepend',
+      ),
+      append: update(config.disabled.append, !enabled && source === 'append'),
+    },
+  }
+}
+
 /** 删除一条自定义规则：启用中的从序列移除，已关闭的从 disabled 移除 */
 export const removeSeqRule = (
   config: SeqRulesConfig,

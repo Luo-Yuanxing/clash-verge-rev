@@ -9,6 +9,7 @@ import {
   type SeqRulesDocument,
   serializeSeqRules,
   toSeqConfig,
+  updateSeqRule,
 } from './seq-rules-document'
 
 vi.mock('@/services/cmds', () => ({ readProfileFile: vi.fn() }))
@@ -139,6 +140,74 @@ describe('applyRuleEnabled', () => {
       prepend: ['DOMAIN,a.com,DIRECT'],
       append: ['DOMAIN,b.com,DIRECT'],
     })
+  })
+})
+
+describe('updateSeqRule', () => {
+  const base = config({
+    prepend: ['DOMAIN,a.com,DIRECT', 'DOMAIN,b.com,DIRECT'],
+    append: ['DOMAIN,c.com,PROXY'],
+    disabled: { prepend: ['DOMAIN,d.com,PROXY'], append: [] },
+  })
+
+  it('rewrites the rule in place', () => {
+    const next = updateSeqRule(
+      base,
+      { rule: 'DOMAIN,a.com,DIRECT', source: 'prepend', enabled: true },
+      'DOMAIN-KEYWORD,a,DIRECT',
+    )
+
+    expect(next.prepend).toEqual([
+      'DOMAIN-KEYWORD,a,DIRECT',
+      'DOMAIN,b.com,DIRECT',
+    ])
+    expect(next.append).toEqual(['DOMAIN,c.com,PROXY'])
+  })
+
+  it('drops a duplicate copy kept in the other sequence', () => {
+    const next = updateSeqRule(
+      config({
+        prepend: ['DOMAIN,a.com,DIRECT'],
+        append: ['DOMAIN,x.com,DIRECT'],
+      }),
+      { rule: 'DOMAIN,a.com,DIRECT', source: 'prepend', enabled: true },
+      'DOMAIN,x.com,DIRECT',
+    )
+
+    expect(next.prepend).toEqual(['DOMAIN,x.com,DIRECT'])
+    expect(next.append).toEqual([])
+  })
+
+  it('drops a duplicate copy kept under disabled', () => {
+    const next = updateSeqRule(
+      base,
+      { rule: 'DOMAIN,a.com,DIRECT', source: 'prepend', enabled: true },
+      'DOMAIN,d.com,PROXY',
+    )
+
+    expect(next.prepend).toEqual(['DOMAIN,d.com,PROXY', 'DOMAIN,b.com,DIRECT'])
+    expect(next.disabled.prepend).toEqual([])
+  })
+
+  it('renames a closed rule without turning it back on', () => {
+    const next = updateSeqRule(
+      base,
+      { rule: 'DOMAIN,d.com,PROXY', source: 'prepend', enabled: false },
+      'DOMAIN,e.com,PROXY',
+    )
+
+    expect(next.disabled.prepend).toEqual(['DOMAIN,e.com,PROXY'])
+    expect(next.prepend).toEqual(['DOMAIN,a.com,DIRECT', 'DOMAIN,b.com,DIRECT'])
+  })
+
+  it('returns the same config when nothing changed', () => {
+    const next = updateSeqRule(
+      base,
+      { rule: 'DOMAIN,a.com,DIRECT', source: 'prepend', enabled: true },
+      'DOMAIN,a.com,DIRECT',
+    )
+
+    expect(next).toBe(base)
   })
 })
 
