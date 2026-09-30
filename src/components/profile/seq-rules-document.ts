@@ -93,6 +93,10 @@ export interface SeqRuleRef {
   enabled: boolean
 }
 
+/** 表格行的唯一标识：启用状态 + 序列 + 规则串，用于勾选待删除的行 */
+export const seqRuleRowId = (row: SeqRuleRef): string =>
+  `${row.enabled ? 'on' : 'off'}\u0000${row.source}\u0000${row.rule}`
+
 /**
  * 勾选即启用：关闭的规则移出 prepend/append 并记入 disabled，
  * 重新启用的规则从 disabled 移回原序列末尾。

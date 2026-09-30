@@ -12,7 +12,9 @@
         "selectAll": "全选",
         "host": "主机",
         "type": "规则类型",
-        "policy": "代理策略"
+        "policy": "代理策略",
+        "delete": "删除",
+        "deleteAll": "全选待删除的规则"
       },
       "visibility": {
         "all": "显示全部",
@@ -21,6 +23,11 @@
       },
       "actions": {
         "save": "保存"
+      },
+      "delete": {
+        "action": "删除所选",
+        "confirmTitle": "删除规则",
+        "confirmText": "确认删除选中的 {{count}} 条规则？删除后无法撤销。"
       },
       "migrate": {
         "action": "迁移",

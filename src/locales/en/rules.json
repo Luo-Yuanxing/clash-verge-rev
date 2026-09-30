@@ -12,7 +12,9 @@
         "selectAll": "Select all",
         "host": "Host",
         "type": "Rule type",
-        "policy": "Proxy policy"
+        "policy": "Proxy policy",
+        "delete": "Delete",
+        "deleteAll": "Select every rule to delete"
       },
       "visibility": {
         "all": "Show all",
@@ -21,6 +23,11 @@
       },
       "actions": {
         "save": "Save"
+      },
+      "delete": {
+        "action": "Delete selected",
+        "confirmTitle": "Delete rules",
+        "confirmText": "Delete the {{count}} selected rules? This cannot be undone."
       },
       "migrate": {
         "action": "Migrate",

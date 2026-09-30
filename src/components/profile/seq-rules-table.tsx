@@ -1,8 +1,4 @@
-import {
-  DeleteForeverRounded,
-  DragIndicatorRounded,
-  FilterListRounded,
-} from '@mui/icons-material'
+import { DragIndicatorRounded, FilterListRounded } from '@mui/icons-material'
 import {
   Box,
   Checkbox,
@@ -29,7 +25,11 @@ import {
   ruleTypeOptions,
   serializeRuleParts,
 } from './rule-fields'
-import type { SeqRuleRef, SeqRuleSource } from './seq-rules-document'
+import {
+  seqRuleRowId,
+  type SeqRuleRef,
+  type SeqRuleSource,
+} from './seq-rules-document'
 
 export type { SeqRuleSource }
 
@@ -49,7 +49,9 @@ interface Props {
   onVisibilityChange: (next: SeqRuleVisibility) => void
   /** 勾选/取消勾选：批量启用或关闭这些规则 */
   onToggle: (rows: SeqRuleRow[], enabled: boolean) => void
-  onDelete: (row: SeqRuleRow) => void
+  /** 勾选待删除的行 id，一键删除由调用方执行 */
+  deleteIds: readonly string[]
+  onDeleteSelect: (rows: SeqRuleRow[], selected: boolean) => void
   onReorder: (source: SeqRuleSource, from: number, to: number) => void
   /** 主机 / 类型 / 策略改完后提交新规则串，重复项由调用方排除 */
   onEdit: (row: SeqRuleRow, nextRule: string) => void
@@ -58,6 +60,8 @@ interface Props {
 const ROW_HEIGHT = 40
 /** 勾选列需同时容纳勾选框与筛选下拉 */
 const SELECT_COLUMN = 64
+/** 待删除勾选列：勾选框 + 列名 */
+const DELETE_COLUMN = 88
 
 /** 筛选视图选项，顺序即菜单顺序 */
 const visibilityOptions: { value: SeqRuleVisibility; labelKey: string }[] = [
@@ -66,13 +70,13 @@ const visibilityOptions: { value: SeqRuleVisibility; labelKey: string }[] = [
   { value: 'disabled', labelKey: 'rules.custom.page.visibility.disabled' },
 ]
 
-/** 勾选（+手柄）列 + 主机 + 规则类型 + 代理策略 + 操作列 */
+/** 勾选（+手柄）列 + 主机 + 规则类型 + 代理策略 + 待删除勾选列 */
 const gridSx = (sortable?: boolean) =>
   ({
     display: 'grid',
     gridTemplateColumns: sortable
-      ? `24px ${SELECT_COLUMN}px minmax(0, 1fr) 150px 200px 48px`
-      : `${SELECT_COLUMN}px minmax(0, 1fr) 150px 200px 48px`,
+      ? `24px ${SELECT_COLUMN}px minmax(0, 1fr) 150px 200px ${DELETE_COLUMN}px`
+      : `${SELECT_COLUMN}px minmax(0, 1fr) 150px 200px ${DELETE_COLUMN}px`,
     alignItems: 'center',
     gap: 1,
     px: 1,
@@ -115,7 +119,8 @@ export const SeqRulesTable = (props: Props) => {
     visibility,
     onVisibilityChange,
     onToggle,
-    onDelete,
+    deleteIds,
+    onDeleteSelect,
     onReorder,
     onEdit,
   } = props
@@ -165,7 +170,7 @@ export const SeqRulesTable = (props: Props) => {
   const items = useMemo<GroupedVirtualItem<SeqRuleRow>[]>(
     () =>
       rows.map((row) => ({
-        id: `${row.enabled ? 'on' : 'off'}\u0000${row.source}\u0000${row.rule}`,
+        id: seqRuleRowId(row),
         // 关闭的规则不属于可排序序列，借 original 类别置为不可拖动
         category: row.enabled ? row.source : 'original',
         item: row,
@@ -173,12 +178,21 @@ export const SeqRulesTable = (props: Props) => {
     [rows],
   )
 
+  const deleteIdSet = useMemo(() => new Set(deleteIds), [deleteIds])
+
   const enabledCount = rows.reduce(
     (count, row) => (row.enabled ? count + 1 : count),
     0,
   )
   const allEnabled = rows.length > 0 && enabledCount === rows.length
   const partiallyEnabled = enabledCount > 0 && !allEnabled
+
+  const pickedCount = rows.reduce(
+    (count, row) => (deleteIdSet.has(seqRuleRowId(row)) ? count + 1 : count),
+    0,
+  )
+  const allPicked = rows.length > 0 && pickedCount === rows.length
+  const partiallyPicked = pickedCount > 0 && !allPicked
 
   const renderItem = (entry: GroupedVirtualItem<SeqRuleRow>) => {
     const { rule, enabled } = entry.item
@@ -266,11 +280,19 @@ export const SeqRulesTable = (props: Props) => {
           ))}
         </Select>
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          {!sortable && (
-            <IconButton size="small" onClick={() => onDelete(entry.item)}>
-              <DeleteForeverRounded fontSize="small" />
-            </IconButton>
-          )}
+          <Checkbox
+            size="small"
+            sx={{ p: 0 }}
+            slotProps={{
+              input: {
+                'aria-label': t('rules.custom.page.columns.delete'),
+              },
+            }}
+            checked={deleteIdSet.has(entry.id)}
+            onChange={() =>
+              onDeleteSelect([entry.item], !deleteIdSet.has(entry.id))
+            }
+          />
         </Box>
       </Box>
     )
@@ -323,7 +345,21 @@ export const SeqRulesTable = (props: Props) => {
       <Typography variant="body2">
         {t('rules.custom.page.columns.policy')}
       </Typography>
-      <Box />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Checkbox
+          size="small"
+          sx={{ p: 0 }}
+          slotProps={{
+            input: { 'aria-label': t('rules.custom.page.columns.deleteAll') },
+          }}
+          checked={allPicked}
+          indeterminate={partiallyPicked}
+          onChange={() => onDeleteSelect(rows, !allPicked)}
+        />
+        <Typography variant="body2">
+          {t('rules.custom.page.columns.delete')}
+        </Typography>
+      </Box>
     </Box>
   )
 

@@ -681,10 +681,17 @@ export interface TranslationResources {
             save: string
           }
           columns: {
+            delete: string
+            deleteAll: string
             host: string
             policy: string
             selectAll: string
             type: string
+          }
+          delete: {
+            action: string
+            confirmText: string
+            confirmTitle: string
           }
           emptyProfile: string
           emptyRules: string

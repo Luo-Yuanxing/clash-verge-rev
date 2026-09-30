@@ -1,5 +1,6 @@
 import {
   ContentCopyRounded,
+  DeleteForeverRounded,
   SaveRounded,
   SortRounded,
 } from '@mui/icons-material'
@@ -8,7 +9,13 @@ import { useLockFn } from 'ahooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { BaseEmpty, BasePage, BaseSearchBox, Switch } from '@/components/base'
+import {
+  BaseDialog,
+  BaseEmpty,
+  BasePage,
+  BaseSearchBox,
+  Switch,
+} from '@/components/base'
 import {
   compareRulesByHostLevel,
   moveItem,
@@ -19,6 +26,7 @@ import {
   readSeqRulesDocument,
   removeSeqRule,
   type SeqRulesConfig,
+  seqRuleRowId,
   serializeSeqRules,
   toSeqConfig,
   updateSeqRule,
@@ -60,6 +68,13 @@ const CustomRulesPage = () => {
   const [dirtyUid, setDirtyUid] = useState('')
   /** 迁移目标订阅下拉菜单的锚点 */
   const [migrateAnchor, setMigrateAnchor] = useState<HTMLElement | null>(null)
+  /** 表格里勾选「删除」的行 id，连同所属订阅一起记，切换订阅后自动失效 */
+  const [deletePicked, setDeletePicked] = useState<{
+    uid: string
+    ids: string[]
+  }>({ uid: '', ids: [] })
+  /** 一键删除前的确认对话框 */
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     void mutateProfiles()
@@ -257,9 +272,36 @@ const CustomRulesPage = () => {
     setDirtyUid(selectedUid)
   }
 
-  /** 删除单条自定义规则：先从列表移除，连同未保存的勾选改动一起在后台写回 */
-  const handleDeleteRule = (row: SeqRuleRow) => {
-    void saveDraft(removeSeqRule(draftRef.current, row))
+  /** 当前订阅里勾选待删除的行 id */
+  const deleteIds = deletePicked.uid === selectedUid ? deletePicked.ids : []
+
+  /** 勾选 / 取消勾选待删除的行，表头全选也走这里 */
+  const handleDeleteSelect = (targets: SeqRuleRow[], selected: boolean) => {
+    const picked = new Set(deleteIds)
+    for (const row of targets) {
+      const id = seqRuleRowId(row)
+      if (selected) picked.add(id)
+      else picked.delete(id)
+    }
+
+    setDeletePicked({ uid: selectedUid, ids: [...picked] })
+  }
+
+  /** 一键删除勾选的行：一次性写回并只重启一次内核 */
+  const handleDeleteSelected = () => {
+    setConfirmDelete(false)
+
+    const picked = new Set(deleteIds)
+    const targets = rows.filter((row) => picked.has(seqRuleRowId(row)))
+    if (targets.length === 0) return
+
+    const next = targets.reduce(
+      (config, row) => removeSeqRule(config, row),
+      draftRef.current,
+    )
+
+    setDeletePicked({ uid: selectedUid, ids: [] })
+    void saveDraft(next)
   }
 
   /** 编辑规则属性：原位置的规则改成新规则，重复的旧规则一并排除，只改本地草稿 */
@@ -453,6 +495,17 @@ const CustomRulesPage = () => {
               </Button>
               <Button
                 size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteForeverRounded />}
+                disabled={deleteIds.length === 0}
+                sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                onClick={() => setConfirmDelete(true)}
+              >
+                {t('rules.custom.page.delete.action')}
+              </Button>
+              <Button
+                size="small"
                 variant="contained"
                 disabled={!dirty}
                 startIcon={<SaveRounded />}
@@ -489,13 +542,29 @@ const CustomRulesPage = () => {
                 onVisibilityChange={setVisibility}
                 onToggle={handleToggleRules}
                 onEdit={handleEditRule}
-                onDelete={handleDeleteRule}
+                deleteIds={deleteIds}
+                onDeleteSelect={handleDeleteSelect}
                 onReorder={(source, from, to) => {
                   void handleReorderRule(source, from, to)
                 }}
               />
             </Box>
           </Box>
+          <BaseDialog
+            open={confirmDelete}
+            title={t('rules.custom.page.delete.confirmTitle')}
+            okBtn={t('shared.actions.confirm')}
+            cancelBtn={t('shared.actions.cancel')}
+            onOk={handleDeleteSelected}
+            onCancel={() => setConfirmDelete(false)}
+            onClose={() => setConfirmDelete(false)}
+          >
+            <Typography variant="body2">
+              {t('rules.custom.page.delete.confirmText', {
+                count: deleteIds.length,
+              })}
+            </Typography>
+          </BaseDialog>
         </>
       ) : (
         <Box
