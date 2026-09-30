@@ -76,14 +76,21 @@ export const QuickConfigBar = () => {
       await revalidateQuery(['getProfiles'])
       await revalidateQuery(['getVergeConfig'])
 
-      showNotice.success(
-        result.name
-          ? {
-              key: 'profiles.page.quickConfig.feedback.imported',
-              params: { name: result.name },
-            }
-          : 'profiles.page.quickConfig.feedback.importedSettingsOnly',
-      )
+      if (result.backupFile) {
+        showNotice.success({
+          key: 'profiles.page.quickConfig.feedback.importedBackup',
+          params: { name: result.backupFile },
+        })
+      } else {
+        showNotice.success(
+          result.name
+            ? {
+                key: 'profiles.page.quickConfig.feedback.imported',
+                params: { name: result.name },
+              }
+            : 'profiles.page.quickConfig.feedback.nothingToImport',
+        )
+      }
       setText('')
     })
 

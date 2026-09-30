@@ -34,3 +34,15 @@ pub async fn import_local_backup(source: String) -> CmdResult<String> {
 pub async fn export_local_backup(filename: String, destination: String) -> CmdResult<()> {
     feat::export_local_backup(filename, destination).await.stringify_err()
 }
+
+/// Read a local backup file as Base64, used by the quick-config export.
+#[tauri::command]
+pub async fn read_local_backup_base64(filename: String) -> CmdResult<String> {
+    feat::read_local_backup_base64(filename).await.stringify_err()
+}
+
+/// Materialize a Base64 payload into the local backup directory, returning the file name.
+#[tauri::command]
+pub async fn write_local_backup_base64(content: String) -> CmdResult<String> {
+    feat::write_local_backup_base64(content).await.stringify_err()
+}

@@ -207,6 +207,8 @@ mod app_init {
             cmd::restore_local_backup,
             cmd::import_local_backup,
             cmd::export_local_backup,
+            cmd::read_local_backup_base64,
+            cmd::write_local_backup_base64,
             cmd::create_webdav_backup,
             cmd::save_webdav_config,
             cmd::list_webdav_backup,

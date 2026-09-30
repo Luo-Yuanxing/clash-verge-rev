@@ -28,7 +28,7 @@
     "quickConfig": {
       "scope": {
         "all": "全部",
-        "allHint": "导出应用设置 + 激活订阅的自定义规则",
+        "allHint": "导出 Verge 完整备份（含订阅与规则），导入后可在设置-备份中恢复",
         "justRule": "仅规则",
         "justRuleHint": "只导出激活订阅的自定义规则"
       },
@@ -38,7 +38,8 @@
       "feedback": {
         "exported": "已生成并复制到剪贴板",
         "imported": "导入完成，新订阅：{{name}}",
-        "importedSettingsOnly": "导入完成",
+        "importedBackup": "备份已导入：{{name}}，可在设置-备份中恢复",
+        "nothingToImport": "配置里没有可导入的内容",
         "invalid": "不是有效的快捷配置",
         "profileFailed": "创建订阅失败",
         "rulesFailed": "写入自定义规则失败",

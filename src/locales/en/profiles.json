@@ -28,7 +28,7 @@
     "quickConfig": {
       "scope": {
         "all": "All",
-        "allHint": "Export app settings plus the custom rules of the active profile",
+        "allHint": "Export a full Verge backup (profiles and rules); restore it from Settings - Backup",
         "justRule": "Rules only",
         "justRuleHint": "Export only the custom rules of the active profile"
       },
@@ -38,7 +38,8 @@
       "feedback": {
         "exported": "Generated and copied to clipboard",
         "imported": "Import finished, new profile: {{name}}",
-        "importedSettingsOnly": "Import finished",
+        "importedBackup": "Backup imported: {{name}}, restore it from Settings - Backup",
+        "nothingToImport": "Nothing to import in this config",
         "invalid": "Not a valid quick config",
         "profileFailed": "Failed to create profile",
         "rulesFailed": "Failed to write custom rules",

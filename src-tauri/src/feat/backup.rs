@@ -8,12 +8,13 @@ use crate::{
     },
 };
 use anyhow::{Result, anyhow};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use chrono::Utc;
 use clash_verge_logging::{Type, logging, logging_error};
 use reqwest_dav::list_cmd::ListFile;
 use serde::Serialize;
 use smartstring::alias::String;
-use std::path::PathBuf;
+use std::{env::consts::OS, path::PathBuf};
 use tokio::fs;
 
 #[derive(Debug, Serialize)]
@@ -248,6 +249,59 @@ pub async fn import_local_backup(source: String) -> Result<String> {
         .map_err(|err| anyhow!("Failed to import backup file: {err:#}"))?;
 
     Ok(file_name.to_string().into())
+}
+
+/// Read a local backup file as Base64 so the quick-config share payload can be text.
+#[tracing::instrument(skip_all, level = "info", fields(filename = %filename))]
+pub async fn read_local_backup_base64(filename: String) -> Result<String> {
+    let backup_dir = local_backup_dir()?;
+    let target_path = backup_dir.join(filename.as_str());
+    if !target_path.exists() {
+        return Err(anyhow!("Backup file not found: {}", filename));
+    }
+
+    let bytes = fs::read(&target_path).await?;
+    Ok(BASE64.encode(bytes).into())
+}
+
+/// Materialize a Base64 quick-config payload into the local backup directory.
+#[tracing::instrument(skip_all, level = "info")]
+pub async fn write_local_backup_base64(content: String) -> Result<String> {
+    let bytes = BASE64
+        .decode(content.trim().as_bytes())
+        .map_err(|err| anyhow!("Invalid Base64 backup payload: {err}"))?;
+
+    let zip_name: std::string::String = format!("{OS}-backup-{}.zip", chrono::Local::now().format("%Y-%m-%d_%H-%M-%S"));
+    let (file_name, target_path) = unique_backup_path(&local_backup_dir()?, &zip_name)?;
+
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent).await?;
+    }
+
+    fs::write(&target_path, &bytes)
+        .await
+        .map_err(|err| anyhow!("Failed to import backup file: {err:#}"))?;
+
+    Ok(file_name.into())
+}
+
+/// Append `-2`, `-3`, ... until the target name is free in the backup directory.
+fn unique_backup_path(backup_dir: &PathBuf, zip_name: &str) -> Result<(std::string::String, PathBuf)> {
+    let preferred = backup_dir.join(zip_name);
+    if !preferred.exists() {
+        return Ok((zip_name.to_owned(), preferred));
+    }
+
+    let (stem, extension) = zip_name.split_once('.').unwrap_or((zip_name, "zip"));
+    for index in 2u32.. {
+        let candidate_name = format!("{stem}-{index}.{extension}");
+        let candidate = backup_dir.join(candidate_name.as_str());
+        if !candidate.exists() {
+            return Ok((candidate_name, candidate));
+        }
+    }
+
+    Err(anyhow!("Failed to allocate a unique backup file name"))
 }
 
 async fn move_file(from: PathBuf, to: PathBuf) -> Result<()> {
