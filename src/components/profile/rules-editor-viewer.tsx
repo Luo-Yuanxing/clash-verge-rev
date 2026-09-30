@@ -38,6 +38,7 @@ import {
   type GroupedVirtualItem,
   GroupedVirtualList,
 } from './grouped-virtual-list'
+import { normalizeDomainSuffix } from './rule-fields'
 import { SeqRulesView } from './seq-rules-view'
 import { useSeqRuleConfig } from './use-seq-rule-config'
 
@@ -492,7 +493,12 @@ export const RulesEditorViewer = (props: Props) => {
       throw new Error(t('rules.modals.editor.form.validation.invalidRule'))
     }
 
-    const condition = (ruleType.required ?? true) ? ruleContent : ''
+    // 域名后缀规则只保留最后两级域名
+    const content =
+      ruleType.name === 'DOMAIN-SUFFIX'
+        ? normalizeDomainSuffix(ruleContent)
+        : ruleContent
+    const condition = (ruleType.required ?? true) ? content : ''
     return `${ruleType.name}${condition ? ',' + condition : ''},${proxyPolicy}${
       ruleType.noResolve && noResolve ? ',no-resolve' : ''
     }`
