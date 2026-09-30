@@ -47,6 +47,10 @@ export function buildGroupedItems<T>(
 interface GroupedVirtualListProps<T> {
   items: GroupedVirtualItem<T>[]
   estimateSize?: number
+  /** 行间距，表格化展示时传 0 */
+  gap?: number
+  /** 固定在滚动区顶部的表头 */
+  header?: ReactNode
   renderItem: (entry: GroupedVirtualItem<T>) => ReactNode
   onReorder: (
     category: 'prepend' | 'append',
@@ -64,6 +68,8 @@ export function GroupedVirtualList<T>(props: GroupedVirtualListProps<T>) {
   const {
     items: itemsProp,
     estimateSize = 56,
+    gap = 8,
+    header,
     renderItem,
     onReorder,
     style,
@@ -84,7 +90,7 @@ export function GroupedVirtualList<T>(props: GroupedVirtualListProps<T>) {
     getScrollElement: () => scrollRef.current,
     estimateSize: () => estimateSize,
     overscan: 15,
-    gap: 8,
+    gap,
     getItemKey: (index) => items[index]?.id ?? index,
   })
 
@@ -149,6 +155,18 @@ export function GroupedVirtualList<T>(props: GroupedVirtualListProps<T>) {
       onDragEnd={onDragEnd}
     >
       <div ref={scrollRef} style={{ ...style, overflow: 'auto' }}>
+        {header && (
+          <div
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 2,
+              marginRight: '4px',
+            }}
+          >
+            {header}
+          </div>
+        )}
         <div
           style={{
             height: virtualizer.getTotalSize(),
