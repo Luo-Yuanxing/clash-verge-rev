@@ -15,6 +15,7 @@
         "policy": "代理策略"
       },
       "visibility": {
+        "all": "显示全部",
         "enabled": "显示启用",
         "disabled": "显示关闭"
       },

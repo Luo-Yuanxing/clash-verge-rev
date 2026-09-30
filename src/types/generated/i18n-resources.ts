@@ -661,6 +661,7 @@ export interface TranslationResources {
           }
           title: string
           visibility: {
+            all: string
             disabled: string
             enabled: string
           }

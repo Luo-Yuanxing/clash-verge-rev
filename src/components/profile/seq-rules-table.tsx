@@ -23,8 +23,8 @@ import { parseRule } from './rule-fields'
 
 export type SeqRuleSource = 'prepend' | 'append'
 
-/** 列表筛选视图：只看启用的规则，或只看已关闭的规则 */
-export type SeqRuleVisibility = 'enabled' | 'disabled'
+/** 列表筛选视图：全部 / 只看启用 / 只看已关闭 */
+export type SeqRuleVisibility = 'all' | 'enabled' | 'disabled'
 
 export interface SeqRuleRow {
   rule: string
@@ -48,6 +48,13 @@ interface Props {
 const ROW_HEIGHT = 40
 /** 勾选列需同时容纳勾选框与筛选下拉 */
 const SELECT_COLUMN = 64
+
+/** 筛选视图选项，顺序即菜单顺序 */
+const visibilityOptions: { value: SeqRuleVisibility; labelKey: string }[] = [
+  { value: 'all', labelKey: 'rules.custom.page.visibility.all' },
+  { value: 'enabled', labelKey: 'rules.custom.page.visibility.enabled' },
+  { value: 'disabled', labelKey: 'rules.custom.page.visibility.disabled' },
+]
 
 /** 勾选（+手柄）列 + 主机 + 规则类型 + 代理策略 + 操作列 */
 const gridSx = (sortable?: boolean) =>
@@ -127,7 +134,7 @@ export const SeqRulesTable = (props: Props) => {
         ) : null}
         <Checkbox
           size="small"
-          sx={{ p: 0 }}
+          sx={{ p: 0, justifySelf: 'start' }}
           slotProps={{ input: { 'aria-label': rule } }}
           checked={enabled}
           onChange={() => onToggle([entry.item], !enabled)}
@@ -157,9 +164,8 @@ export const SeqRulesTable = (props: Props) => {
   }
 
   const visibilityLabel = t(
-    visibility === 'enabled'
-      ? 'rules.custom.page.visibility.enabled'
-      : 'rules.custom.page.visibility.disabled',
+    visibilityOptions.find((option) => option.value === visibility)?.labelKey ??
+      visibilityOptions[0].labelKey,
   )
 
   const header = (
@@ -187,7 +193,7 @@ export const SeqRulesTable = (props: Props) => {
         <Tooltip title={visibilityLabel}>
           <IconButton
             size="small"
-            sx={{ p: 0.25 }}
+            sx={{ p: 0, width: 24, height: 24 }}
             aria-label={visibilityLabel}
             onClick={(event) => setMenuAnchor(event.currentTarget)}
           >
@@ -225,24 +231,18 @@ export const SeqRulesTable = (props: Props) => {
         open={!!menuAnchor}
         onClose={() => setMenuAnchor(null)}
       >
-        <MenuItem
-          selected={visibility === 'enabled'}
-          onClick={() => {
-            onVisibilityChange('enabled')
-            setMenuAnchor(null)
-          }}
-        >
-          {t('rules.custom.page.visibility.enabled')}
-        </MenuItem>
-        <MenuItem
-          selected={visibility === 'disabled'}
-          onClick={() => {
-            onVisibilityChange('disabled')
-            setMenuAnchor(null)
-          }}
-        >
-          {t('rules.custom.page.visibility.disabled')}
-        </MenuItem>
+        {visibilityOptions.map(({ value, labelKey }) => (
+          <MenuItem
+            key={value}
+            selected={visibility === value}
+            onClick={() => {
+              onVisibilityChange(value)
+              setMenuAnchor(null)
+            }}
+          >
+            {t(labelKey)}
+          </MenuItem>
+        ))}
       </Menu>
     </>
   )

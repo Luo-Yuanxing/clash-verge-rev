@@ -15,6 +15,7 @@
         "policy": "Proxy policy"
       },
       "visibility": {
+        "all": "Show all",
         "enabled": "Show enabled",
         "disabled": "Show disabled"
       },

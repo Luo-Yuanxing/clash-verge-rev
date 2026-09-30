@@ -45,8 +45,8 @@ const CustomRulesPage = () => {
   const [autoUid, setAutoUid] = useState('')
   /** 默认按域名层级排序，可切回规则命中的原始顺序 */
   const [order, setOrder] = useState<'domain' | 'original'>('domain')
-  /** 列表只显示启用中的规则，或只显示已关闭的规则 */
-  const [visibility, setVisibility] = useState<SeqRuleVisibility>('enabled')
+  /** 列表默认显示全部规则，可切换到只看启用或只看已关闭的规则 */
+  const [visibility, setVisibility] = useState<SeqRuleVisibility>('all')
 
   useEffect(() => {
     void mutateProfiles()
@@ -127,7 +127,9 @@ const CustomRulesPage = () => {
   const filteredRows = useMemo(() => {
     const matched = rows.filter(
       ({ rule, enabled }) =>
-        (visibility === 'enabled' ? enabled : !enabled) && match(rule),
+        (visibility === 'all' ||
+          (visibility === 'enabled' ? enabled : !enabled)) &&
+        match(rule),
     )
     // 原始顺序即规则命中的顺序（prepend → append）
     if (order === 'original') return matched
