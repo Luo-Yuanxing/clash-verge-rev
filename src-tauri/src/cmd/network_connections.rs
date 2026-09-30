@@ -64,7 +64,7 @@ fn collect_system_connections() -> SystemConnectionSnapshot {
 mod windows {
     use std::{
         collections::HashMap,
-        mem::size_of,
+        mem::{size_of, size_of_val},
         net::{Ipv4Addr, Ipv6Addr},
         ptr::null_mut,
     };
@@ -176,12 +176,12 @@ mod windows {
     ///
     /// # Safety
     /// `buffer` must come from an OS socket table whose rows are `Row`.
-    unsafe fn rows<Row>(buffer: &[u32]) -> &[Row] {
+    const unsafe fn rows<Row>(buffer: &[u32]) -> &[Row] {
         let Some((&row_count, rest)) = buffer.split_first() else {
             return &[];
         };
         let row_count = row_count as usize;
-        if rest.len() * size_of::<u32>() < row_count * size_of::<Row>() {
+        if size_of_val(rest) < row_count * size_of::<Row>() {
             return &[];
         }
         // SAFETY: `rest` covers `row_count` whole rows and the table buffer is aligned
