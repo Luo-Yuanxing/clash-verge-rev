@@ -24,6 +24,13 @@
 </details>
 
 <details>
+<summary><strong> ✨ 新增功能 </strong></summary>
+
+- 新增「自定义规则」页面，集中查看当前订阅自定义的规则条目
+
+</details>
+
+<details>
 <summary><strong> 🚀 优化改进 </strong></summary>
 
 - 优化内核启动失败和服务模式内核意外停止的提示：显示具体原因，并在窗口恢复后提示尚未解决的错误
