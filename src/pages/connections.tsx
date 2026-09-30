@@ -36,6 +36,7 @@ import {
   ConnectionDetail,
   ConnectionDetailRef,
 } from '@/components/connection/connection-detail'
+import { mergeHistoryConnections } from '@/components/connection/connection-history-merge'
 import { ConnectionRowItem } from '@/components/connection/connection-row-item'
 import {
   formatConnectionChains,
@@ -160,8 +161,9 @@ const ConnectionsPage = () => {
       frozenRef.current = {
         activeConnections: connections?.activeConnections ?? EMPTY_CONNECTIONS,
         closedConnections: connections?.closedConnections ?? EMPTY_CONNECTIONS,
-        historyConnections:
+        historyConnections: mergeHistoryConnections(
           connections?.historyConnections ?? EMPTY_CONNECTIONS,
+        ),
       }
       setPaused(true)
       return
@@ -183,8 +185,10 @@ const ConnectionsPage = () => {
               connections?.activeConnections ?? EMPTY_CONNECTIONS,
             closedConnections:
               connections?.closedConnections ?? EMPTY_CONNECTIONS,
-            historyConnections:
+            // 历史列表按主机压缩，连接时间取最近一次，流量累加
+            historyConnections: mergeHistoryConnections(
               connections?.historyConnections ?? EMPTY_CONNECTIONS,
+            ),
           },
     [paused, connections],
   )
