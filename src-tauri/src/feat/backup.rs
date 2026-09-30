@@ -294,15 +294,19 @@ pub async fn read_local_backup_base64(filename: String) -> Result<RuledBackupPay
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index)?;
         let name = entry.name().to_owned();
-        if name.starts_with("profiles/") || name == "profiles.yaml" {
-            continue;
-        }
 
         let mut buffer = Vec::new();
         entry.read_to_end(&mut buffer)?;
-        if let Ok(text) = std::str::from_utf8(&buffer) {
-            contents.insert(name.clone().into(), text.into());
+
+        // Profiles and the profile index are read as rule sources but never travel in `settings`.
+        if name.starts_with("profiles/") || name == "profiles.yaml" {
+            if let Ok(text) = std::str::from_utf8(&buffer) {
+                let key = name.trim_start_matches("profiles/").to_owned();
+                contents.insert(key.into(), text.into());
+            }
+            continue;
         }
+
         settings.push((name, buffer));
     }
 
@@ -310,23 +314,24 @@ pub async fn read_local_backup_base64(filename: String) -> Result<RuledBackupPay
     let mut seen: HashSet<std::string::String> = HashSet::new();
     let profile_items = Config::profiles().await;
     let profile_items = profile_items.latest_arc();
+    // Only the custom rules of each profile: `item.file` is the profile body or an
+    // auxiliary template (merge/script/proxies/groups), which must not travel.
+    // `option.rules` stores the uid without extension, so try the known suffixes.
     for item in profile_items.items.iter().flatten() {
-        let candidates = [
-            item.file.as_ref(),
-            item.option.as_ref().and_then(|option| option.rules.as_ref()),
-        ];
-        for uid in candidates.into_iter().flatten() {
-            let Some(content) = contents.get(uid.as_str()) else {
-                continue;
-            };
-            if !seen.insert(uid.clone().into()) {
-                continue;
-            }
-            rules.push(RuledBackupRule {
-                name: item.name.clone().unwrap_or_else(|| uid.clone()).into(),
-                content: content.clone().into(),
-            });
+        let Some(rules_uid) = item.option.as_ref().and_then(|option| option.rules.as_ref()) else {
+            continue;
+        };
+        let Some((file_name, content)) = lookup_profile_file(&contents, rules_uid.as_str()) else {
+            continue;
+        };
+        if !seen.insert(file_name.clone().into()) {
+            continue;
         }
+
+        rules.push(RuledBackupRule {
+            name: item.name.clone().unwrap_or_else(|| rules_uid.clone()).into(),
+            content: content.into(),
+        });
     }
 
     let zip_bytes = build_settings_zip(&settings)?;
@@ -338,6 +343,24 @@ pub async fn read_local_backup_base64(filename: String) -> Result<RuledBackupPay
         settings: format!("{QUICK_CONFIG_PREFIX}{}", BASE64.encode(compressed)).into(),
         rules,
     })
+}
+
+/// Resolve a profile uid to its stored file, tolerating a missing extension.
+fn lookup_profile_file<'a>(
+    contents: &'a HashMap<std::string::String, std::string::String>,
+    uid: &str,
+) -> Option<(std::string::String, &'a std::string::String)> {
+    let direct: std::string::String = uid.into();
+    let with_yaml: std::string::String = format!("{uid}.yaml").into();
+    let with_js: std::string::String = format!("{uid}.js").into();
+
+    for candidate in [direct, with_yaml, with_js] {
+        if let Some(content) = contents.get(candidate.as_str()) {
+            return Some((candidate, content));
+        }
+    }
+
+    None
 }
 
 /// Rebuild a stored-only zip from the entries that survive the settings filter.
@@ -516,4 +539,39 @@ pub async fn export_local_backup(filename: String, destination: String) -> Resul
         .map(|_| ())
         .map_err(|err| anyhow!("Failed to export backup file: {err:#}"))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lookup_profile_file;
+    use std::collections::HashMap;
+
+    fn contents() -> HashMap<std::string::String, std::string::String> {
+        let mut map = HashMap::new();
+        map.insert("rUNac6iXxZs1.yaml".into(), "prepend: []".into());
+        map.insert("Script.js".into(), "// script".into());
+        map.insert("L3RRB6ml8r8q.yaml".into(), "prepend: []".into());
+        map
+    }
+
+    #[test]
+    fn resolves_uid_without_extension() {
+        let map = contents();
+        let (file, content) = lookup_profile_file(&map, "rUNac6iXxZs1").expect("rules file");
+        assert_eq!(file, "rUNac6iXxZs1.yaml");
+        assert_eq!(content, "prepend: []");
+    }
+
+    #[test]
+    fn resolves_script_uid() {
+        let map = contents();
+        let (file, _) = lookup_profile_file(&map, "Script").expect("script file");
+        assert_eq!(file, "Script.js");
+    }
+
+    #[test]
+    fn ignores_unknown_uid() {
+        let map = contents();
+        assert!(lookup_profile_file(&map, "missing").is_none());
+    }
 }
