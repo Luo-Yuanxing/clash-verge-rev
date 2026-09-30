@@ -61,3 +61,7 @@ pnpm typecheck && pnpm lint && pnpm format:check && pnpm test
 ## 提交风格
 
 参考历史,但一律使用中文作为提交消息
+
+## 补充说明
+
+尽可能的不要**编译**等耗时操作,用户会自行检查
