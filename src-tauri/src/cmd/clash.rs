@@ -113,6 +113,14 @@ pub async fn test_delay(url: String) -> CmdResult<u32> {
     Ok(result)
 }
 
+/// 主动探测：目标必须在 timeout_ms 内返回响应，否则返回错误
+#[tauri::command]
+pub async fn test_host_response(url: String, timeout_ms: u64) -> CmdResult<u32> {
+    feat::test_host_response(url, timeout_ms)
+        .await
+        .map_err(|error| proxy_aware_coded_error(&error, "HOST_PROBE_FAILED"))
+}
+
 #[tauri::command]
 pub async fn save_dns_config(dns_config: Mapping) -> CmdResult {
     use crate::utils::dirs;

@@ -111,13 +111,35 @@ pub async fn change_clash_mode(mode: String) -> Result<(), String> {
 /// HTTPS: measures TLS handshake time. HTTP: measures HEAD round-trip time.
 #[tracing::instrument(skip_all, level = "trace", fields(url = %url))]
 pub async fn test_delay(url: String) -> anyhow::Result<u32> {
-    use std::sync::Arc;
-    use std::time::Duration;
+    tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        measure_delay(&url, std::time::Duration::from_secs(10)),
+    )
+    .await
+    .unwrap_or(Ok(10000u32))
+}
+
+/// Check whether a host really answers, through the local proxy when it is enabled.
+/// A tunnel that opens but never replies is reported as a timeout, not a success.
+#[tracing::instrument(skip_all, level = "trace", fields(url = %url))]
+pub async fn test_host_response(url: String, timeout_ms: u64) -> anyhow::Result<u32> {
+    let timeout = std::time::Duration::from_millis(timeout_ms);
+
+    match tokio::time::timeout(timeout, measure_delay(&url, timeout)).await {
+        Ok(Ok(elapsed)) => Ok(elapsed),
+        Ok(Err(err)) => Err(err),
+        Err(_) => Err(anyhow::anyhow!("no response within {timeout_ms}ms")),
+    }
+}
+
+/// 探测给定 URL：连上目标（需要时经本地代理）并等待一个响应，返回耗时毫秒。
+async fn measure_delay(url: &str, timeout: std::time::Duration) -> anyhow::Result<u32> {
+    use std::time::Instant;
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
     use tokio::net::TcpStream;
-    use tokio::time::Instant;
+    use tokio::time::timeout as timeout_after;
 
-    let parsed = tauri::Url::parse(&url)?;
+    let parsed = tauri::Url::parse(url)?;
     let is_https = parsed.scheme() == "https";
     let host = parsed
         .host_str()
@@ -133,46 +155,55 @@ pub async fn test_delay(url: String) -> anyhow::Result<u32> {
         None
     };
 
-    tokio::time::timeout(Duration::from_secs(10), async {
-        let start = Instant::now();
-        let mut buf = BytesMut::with_capacity(1024);
+    let start = Instant::now();
+    let mut buf = BytesMut::with_capacity(1024);
 
-        if is_https {
-            let stream = match proxy_port {
-                Some(pp) => {
-                    let mut s = TcpStream::connect(format!("127.0.0.1:{pp}")).await?;
-                    s.write_all(format!("CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n").as_bytes())
-                        .await?;
-                    s.read_buf(&mut buf).await?;
-                    if !buf.windows(3).any(|w| w == b"200") {
-                        return Err(anyhow::anyhow!("Proxy CONNECT failed"));
-                    }
-                    s
+    if is_https {
+        let stream = match proxy_port {
+            Some(pp) => {
+                let mut s = TcpStream::connect(format!("127.0.0.1:{pp}")).await?;
+                s.write_all(format!("CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n").as_bytes())
+                    .await?;
+                timeout_after(timeout, s.read_buf(&mut buf)).await??;
+                if !buf.windows(3).any(|w| w == b"200") {
+                    return Err(anyhow::anyhow!("Proxy CONNECT failed"));
                 }
-                None => TcpStream::connect(format!("{host}:{port}")).await?,
-            };
-            let connector = tokio_rustls::TlsConnector::from(Arc::clone(&TLS_CONFIG));
-            let server_name = rustls::pki_types::ServerName::try_from(host.as_str())
-                .map_err(|_| anyhow::anyhow!("Invalid DNS name: {host}"))?
-                .to_owned();
-            connector.connect(server_name, stream).await?;
-        } else {
-            let (mut stream, req) = match proxy_port {
-                Some(pp) => (
-                    TcpStream::connect(format!("127.0.0.1:{pp}")).await?,
-                    format!("HEAD {url} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"),
-                ),
-                None => (
-                    TcpStream::connect(format!("{host}:{port}")).await?,
-                    format!("HEAD / HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"),
-                ),
-            };
-            stream.write_all(req.as_bytes()).await?;
-            let _ = stream.read(&mut buf).await?;
-        }
+                s
+            }
+            None => TcpStream::connect(format!("{host}:{port}")).await?,
+        };
+        let connector = tokio_rustls::TlsConnector::from(Arc::clone(&TLS_CONFIG));
+        let server_name = rustls::pki_types::ServerName::try_from(host.as_str())
+            .map_err(|_| anyhow::anyhow!("Invalid DNS name: {host}"))?
+            .to_owned();
+        let mut tls = timeout_after(timeout, connector.connect(server_name, stream)).await??;
 
-        Ok((start.elapsed().as_millis() as u32).max(1))
-    })
-    .await
-    .unwrap_or(Ok(10000u32))
+        // TLS 握手成功不代表主机可用：再发一个 HEAD，等到任何响应为止
+        buf.clear();
+        let request =
+            format!("HEAD / HTTP/1.1\r\nHost: {host}\r\nUser-Agent: clash-verge\r\nConnection: close\r\n\r\n");
+        tls.write_all(request.as_bytes()).await?;
+        let read = timeout_after(timeout, tls.read_buf(&mut buf)).await??;
+        if read == 0 {
+            return Err(anyhow::anyhow!("Connection closed without response"));
+        }
+    } else {
+        let (mut stream, req) = match proxy_port {
+            Some(pp) => (
+                TcpStream::connect(format!("127.0.0.1:{pp}")).await?,
+                format!("HEAD {url} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: clash-verge\r\nConnection: close\r\n\r\n"),
+            ),
+            None => (
+                TcpStream::connect(format!("{host}:{port}")).await?,
+                format!("HEAD / HTTP/1.1\r\nHost: {host}\r\nUser-Agent: clash-verge\r\nConnection: close\r\n\r\n"),
+            ),
+        };
+        stream.write_all(req.as_bytes()).await?;
+        let read = timeout_after(timeout, stream.read_buf(&mut buf)).await??;
+        if read == 0 {
+            return Err(anyhow::anyhow!("Connection closed without response"));
+        }
+    }
+
+    Ok((start.elapsed().as_millis() as u32).max(1))
 }
