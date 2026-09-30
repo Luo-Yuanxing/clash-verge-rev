@@ -187,6 +187,7 @@ mod app_init {
             cmd::open_devtools,
             cmd::exit_app,
             cmd::get_network_interfaces_info,
+            cmd::get_system_connections,
             cmd::get_profiles,
             cmd::enhance_profiles,
             cmd::patch_profiles_config,
