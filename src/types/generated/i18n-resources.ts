@@ -46,7 +46,6 @@ export interface TranslationResources {
             saveFailed: string
           }
           labels: {
-            position: string
             proxyGroup: string
           }
           more: string
@@ -57,10 +56,7 @@ export interface TranslationResources {
           policies: {
             PROXY: string
           }
-          positions: {
-            append: string
-            prepend: string
-          }
+          positionHint: string
           skipped: string
           summary: string
           title: string

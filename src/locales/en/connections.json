@@ -36,16 +36,12 @@
     "ruleDialog": {
       "title": "Create rules from connections",
       "labels": {
-        "proxyGroup": "Proxy group",
-        "position": "Insert position"
+        "proxyGroup": "Proxy group"
       },
       "policies": {
         "PROXY": "Proxy (pick a group)"
       },
-      "positions": {
-        "prepend": "Insert at top",
-        "append": "Insert at bottom"
-      },
+      "positionHint": "Rules are always added as prepend rules and cannot be changed",
       "summary": "{{count}} rule(s) will be created from the selected hostnames",
       "skipped": "Skipped {{count}} IP connection(s)",
       "empty": "No hostname available for rules",

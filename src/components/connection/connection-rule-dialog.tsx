@@ -37,10 +37,6 @@ const POLICY_OPTIONS = ['DIRECT', 'REJECT', 'REJECT-DROP', 'PROXY'] as const
 
 type PolicyOption = (typeof POLICY_OPTIONS)[number]
 
-type InsertPosition = 'prepend' | 'append'
-
-const POSITION_OPTIONS: InsertPosition[] = ['prepend', 'append']
-
 const MAX_PREVIEW_RULES = 20
 
 interface Props {
@@ -61,8 +57,6 @@ export const ConnectionRuleDialog = (props: Props) => {
 
   const [ruleType, setRuleType] = useState<RuleType>(RULE_TYPES[0])
   const [policyOption, setPolicyOption] = useState<PolicyOption>('DIRECT')
-  const [insertPosition, setInsertPosition] =
-    useState<InsertPosition>('prepend')
   const [proxyGroups, setProxyGroups] = useState<string[]>([])
   const [proxyGroup, setProxyGroup] = useLocalStorage(
     'connection-rule-proxy-group',
@@ -133,17 +127,15 @@ export const ConnectionRuleDialog = (props: Props) => {
         return
       }
 
-      const nextPrepend =
-        insertPosition === 'prepend' ? [...created, ...prepend] : prepend
-      const nextAppend =
-        insertPosition === 'append' ? [...append, ...created] : append
+      // 固定为前置规则
+      const nextPrepend = [...created, ...prepend]
 
       if (
         !(await saveProfileFile(
           rulesProperty,
           serializeSeqRules({
             prepend: nextPrepend,
-            append: nextAppend,
+            append,
             delete: deleteList,
           }),
         ))
@@ -230,33 +222,19 @@ export const ConnectionRuleDialog = (props: Props) => {
               />
             </Item>
           )}
-
-          <Item>
-            <ListItemText
-              primary={t('connections.components.ruleDialog.labels.position')}
-            />
-            <TextField
-              select
-              size="small"
-              sx={{ minWidth: 240 }}
-              value={insertPosition}
-              onChange={(event) =>
-                setInsertPosition(event.target.value as InsertPosition)
-              }
-            >
-              {POSITION_OPTIONS.map((position) => (
-                <MenuItem key={position} value={position}>
-                  {t(`connections.components.ruleDialog.positions.${position}`)}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Item>
         </List>
 
         <Typography variant="body2" sx={{ mt: 1 }}>
           {t('connections.components.ruleDialog.summary', {
             count: rules.length,
           })}
+        </Typography>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block' }}
+        >
+          {t('connections.components.ruleDialog.positionHint')}
         </Typography>
         {!rulesProperty && (
           <Typography variant="caption" color="error" sx={{ display: 'block' }}>

@@ -36,16 +36,12 @@
     "ruleDialog": {
       "title": "一键创建规则",
       "labels": {
-        "proxyGroup": "代理组",
-        "position": "插入位置"
+        "proxyGroup": "代理组"
       },
       "policies": {
         "PROXY": "Proxy（自选代理组）"
       },
-      "positions": {
-        "prepend": "插入到最前",
-        "append": "插入到最后"
-      },
+      "positionHint": "规则固定添加为前置规则（prepend），不可更改",
       "summary": "将创建 {{count}} 条规则，规则内容为连接的主机名",
       "skipped": "已跳过 {{count}} 个 IP 类型的连接",
       "empty": "没有可创建规则的主机名",
