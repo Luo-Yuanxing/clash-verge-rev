@@ -3,7 +3,7 @@ import { useLockFn } from 'ahooks'
 import { forwardRef, useImperativeHandle, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { BaseDialog, DialogRef, Switch } from '@/components/base'
+import { BaseDialog, type DialogRef, Switch } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
 
@@ -23,7 +23,6 @@ const HOTKEY_FUNC = [
   'clash_mode_direct',
   'toggle_system_proxy',
   'toggle_tun_mode',
-  'entry_lightweight_mode',
   'reactivate_profiles',
 ] as const
 
@@ -35,8 +34,6 @@ const HOTKEY_FUNC_LABELS: Record<(typeof HOTKEY_FUNC)[number], string> = {
   clash_mode_direct: 'settings.modals.hotkey.functions.direct',
   toggle_system_proxy: 'settings.modals.hotkey.functions.toggleSystemProxy',
   toggle_tun_mode: 'settings.modals.hotkey.functions.toggleTunMode',
-  entry_lightweight_mode:
-    'settings.modals.hotkey.functions.entryLightweightMode',
   reactivate_profiles: 'settings.modals.hotkey.functions.reactivateProfiles',
 }
 

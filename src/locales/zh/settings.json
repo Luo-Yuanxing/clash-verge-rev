@@ -183,8 +183,7 @@
         "title": "Verge 高级设置",
         "tooltips": {
           "backupInfo": "支持本地或 WebDAV 方式备份配置文件",
-          "openConfDir": "如果软件运行异常，!备份!并删除此文件夹下的所有文件，重启软件",
-          "liteMode": "关闭 GUI 界面，仅保留内核运行"
+          "openConfDir": "如果软件运行异常，!备份!并删除此文件夹下的所有文件，重启软件"
         },
         "actions": {
           "copyVersion": "复制 Verge 版本号"
@@ -201,7 +200,6 @@
           "openLogsDir": "日志目录",
           "checkUpdates": "检查更新",
           "openDevTools": "开发者工具",
-          "liteModeSettings": "轻量模式设置",
           "exit": "退出",
           "exportDiagnostics": "导出诊断信息",
           "vergeVersion": "Verge 版本"
@@ -302,24 +300,6 @@
       "variants": {
         "release": "正式版",
         "alpha": "预览版"
-      }
-    },
-    "liteMode": {
-      "title": "轻量模式设置",
-      "actions": {
-        "enterNow": "立即进入轻量模式"
-      },
-      "toggles": {
-        "autoEnter": "自动进入轻量模式"
-      },
-      "tooltips": {
-        "autoEnter": "启用后，将在窗口关闭一段时间后自动激活轻量模式"
-      },
-      "fields": {
-        "delay": "自动进入轻量模式延迟"
-      },
-      "messages": {
-        "autoEnterHint": "关闭窗口后，轻量模式将在 {{n}} 分钟后自动激活"
       }
     },
     "backup": {
@@ -635,7 +615,6 @@
         "openOrCloseDashboard": "打开/关闭面板",
         "toggleSystemProxy": "打开/关闭系统代理",
         "toggleTunMode": "打开/关闭 TUN 模式",
-        "entryLightweightMode": "进入轻量模式",
         "direct": "直连模式",
         "reactivateProfiles": "重新激活订阅"
       }

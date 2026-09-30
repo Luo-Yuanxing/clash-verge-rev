@@ -1,7 +1,6 @@
 import {
   DnsOutlined,
   HelpOutlineRounded,
-  HistoryEduOutlined,
   RefreshRounded,
   RouterOutlined,
   SettingsOutlined,
@@ -36,7 +35,6 @@ import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { useProfiles } from '@/hooks/use-profiles'
 import { resetTrafficTotals } from '@/hooks/use-traffic-data'
 import { useVerge } from '@/hooks/use-verge'
-import { entry_lightweight_mode } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 import { openExternalUrl } from '@/utils/open-external-url'
 
@@ -334,15 +332,6 @@ const HomePage = () => {
       contentStyle={{ padding: 2 }}
       header={
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Tooltip title={t('home.page.tooltips.lightweightMode')} arrow>
-            <IconButton
-              onClick={async () => await entry_lightweight_mode()}
-              size="small"
-              color="inherit"
-            >
-              <HistoryEduOutlined />
-            </IconButton>
-          </Tooltip>
           <Tooltip title={t('home.page.tooltips.manual')} arrow>
             <IconButton onClick={toGithubDoc} size="small" color="inherit">
               <HelpOutlineRounded />

@@ -3,7 +3,7 @@ import { Typography } from '@mui/material'
 import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DialogRef, TooltipIcon } from '@/components/base'
+import { type DialogRef, TooltipIcon } from '@/components/base'
 import { updateLastCheckTime } from '@/hooks/use-update'
 import {
   exitApp,
@@ -21,7 +21,6 @@ import { BackupViewer } from './mods/backup-viewer'
 import { ConfigViewer } from './mods/config-viewer'
 import { HotkeyViewer } from './mods/hotkey-viewer'
 import { LayoutViewer } from './mods/layout-viewer'
-import { LiteModeViewer } from './mods/lite-mode-viewer'
 import { MiscViewer } from './mods/misc-viewer'
 import { SettingItem, SettingList } from './mods/setting-comp'
 import { ThemeViewer } from './mods/theme-viewer'
@@ -41,7 +40,6 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
   const layoutRef = useRef<DialogRef>(null)
   const updateRef = useRef<DialogRef>(null)
   const backupRef = useRef<DialogRef>(null)
-  const liteModeRef = useRef<DialogRef>(null)
 
   const onCheckUpdate = async () => {
     try {
@@ -83,7 +81,6 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
       <LayoutViewer ref={layoutRef} />
       <UpdateViewer ref={updateRef} />
       <BackupViewer ref={backupRef} />
-      <LiteModeViewer ref={liteModeRef} />
 
       <SettingItem
         onClick={() => backupRef.current?.open()}
@@ -130,17 +127,6 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
       <SettingItem
         onClick={openDevTools}
         label={t('settings.components.verge.advanced.fields.openDevTools')}
-      />
-
-      <SettingItem
-        label={t('settings.components.verge.advanced.fields.liteModeSettings')}
-        extra={
-          <TooltipIcon
-            title={t('settings.components.verge.advanced.tooltips.liteMode')}
-            sx={{ opacity: '0.7' }}
-          />
-        }
-        onClick={() => liteModeRef.current?.open()}
       />
 
       <SettingItem

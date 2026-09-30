@@ -201,7 +201,6 @@
           "openLogsDir": "Open Logs Dir",
           "checkUpdates": "Check for Updates",
           "openDevTools": "Dev Tools",
-          "liteModeSettings": "LightWeight Mode Settings",
           "exit": "Exit",
           "exportDiagnostics": "Export Diagnostic Info",
           "vergeVersion": "Verge Version"
@@ -302,24 +301,6 @@
       "variants": {
         "release": "Release Version",
         "alpha": "Alpha Version"
-      }
-    },
-    "liteMode": {
-      "title": "LightWeight Mode Settings",
-      "actions": {
-        "enterNow": "Enter LightWeight Mode Now"
-      },
-      "toggles": {
-        "autoEnter": "Auto Enter LightWeight Mode"
-      },
-      "tooltips": {
-        "autoEnter": "Enable to automatically activate LightWeight Mode after the window is closed for a period of time"
-      },
-      "fields": {
-        "delay": "Auto Enter LightWeight Mode Delay"
-      },
-      "messages": {
-        "autoEnterHint": "When closing the window, LightWeight Mode will be automatically activated after {{n}} minutes"
       }
     },
     "backup": {
@@ -635,7 +616,6 @@
         "openOrCloseDashboard": "Open/Close Dashboard",
         "toggleSystemProxy": "Enable/Disable System Proxy",
         "toggleTunMode": "Enable/Disable Tun Mode",
-        "entryLightweightMode": "Entry Lightweight Mode",
         "direct": "Direct Mode",
         "reactivateProfiles": "Reactivate Profiles"
       }
