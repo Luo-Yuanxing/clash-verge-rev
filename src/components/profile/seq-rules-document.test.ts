@@ -209,6 +209,16 @@ describe('updateSeqRule', () => {
 
     expect(next).toBe(base)
   })
+
+  it('leaves one copy when an edited rule collides with an existing one', () => {
+    const next = updateSeqRule(
+      config({ prepend: ['DOMAIN,a.com,DIRECT', 'DOMAIN,b.com,DIRECT'] }),
+      { rule: 'DOMAIN,a.com,DIRECT', source: 'prepend', enabled: true },
+      'DOMAIN,b.com,DIRECT',
+    )
+
+    expect(next.prepend).toEqual(['DOMAIN,b.com,DIRECT'])
+  })
 })
 
 describe('removeSeqRule', () => {
