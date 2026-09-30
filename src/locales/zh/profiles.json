@@ -4,6 +4,7 @@
       "updateAll": "更新所有订阅",
       "viewRuntimeConfig": "查看运行时订阅",
       "reactivate": "重新激活订阅",
+      "quickConfig": "快捷导出 / 导入配置",
       "import": "导入"
     },
     "batch": {
@@ -216,6 +217,33 @@
     },
     "qrViewer": {
       "title": "订阅二维码"
+    },
+    "quickConfig": {
+      "title": "快捷导出 / 导入配置",
+      "scope": {
+        "label": "导出范围",
+        "all": "全部（设置 + 自定义规则）",
+        "justRule": "仅自定义规则"
+      },
+      "export": {
+        "action": "生成",
+        "copy": "复制"
+      },
+      "import": {
+        "action": "导入",
+        "placeholder": "粘贴 Base64 配置"
+      },
+      "hint": "导出为 JSON 的 Base64（不加密），只取激活订阅的自定义规则，不含订阅信息；导入时以 Base64 前 8 位新建订阅并挂上自定义规则。",
+      "feedback": {
+        "exported": "已生成并复制到剪贴板",
+        "copied": "已复制到剪贴板",
+        "imported": "导入完成，新订阅：{{name}}",
+        "importedSettingsOnly": "导入完成",
+        "invalid": "不是有效的快捷配置",
+        "profileFailed": "创建订阅失败",
+        "rulesFailed": "写入自定义规则失败",
+        "failed": "操作失败"
+      }
     }
   }
 }

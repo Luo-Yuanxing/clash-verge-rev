@@ -11,6 +11,7 @@ import {
   ClearRounded,
   ContentPasteRounded,
   DeleteRounded,
+  ImportExportRounded,
   IndeterminateCheckBoxRounded,
   LocalFireDepartmentRounded,
   RefreshRounded,
@@ -38,6 +39,7 @@ import {
   ProfileViewer,
   type ProfileViewerRef,
 } from '@/components/profile/profile-viewer'
+import { QuickConfigDialog } from '@/components/profile/quick-config-dialog'
 import { ConfigViewer } from '@/components/setting/mods/config-viewer'
 import { useListen } from '@/hooks/use-listen'
 import { fetchProfilesIntoCache, useProfiles } from '@/hooks/use-profiles'
@@ -200,6 +202,7 @@ const ProfilePage = () => {
 
   const viewerRef = useRef<ProfileViewerRef>(null)
   const configRef = useRef<DialogRef>(null)
+  const quickConfigRef = useRef<DialogRef>(null)
 
   const profileItems = useMemo(() => {
     const items = profiles.items || []
@@ -744,6 +747,15 @@ const ProfilePage = () => {
 
               <IconButton
                 size="small"
+                color="inherit"
+                title={t('profiles.page.actions.quickConfig')}
+                onClick={() => quickConfigRef.current?.open()}
+              >
+                <ImportExportRounded />
+              </IconButton>
+
+              <IconButton
+                size="small"
                 color="primary"
                 title={t('profiles.page.actions.reactivate')}
                 onClick={() => onEnhance(true)}
@@ -992,6 +1004,7 @@ const ProfilePage = () => {
         }}
       />
       <ConfigViewer ref={configRef} />
+      <QuickConfigDialog ref={quickConfigRef} />
     </BasePage>
   )
 }
