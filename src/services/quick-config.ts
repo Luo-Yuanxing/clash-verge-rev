@@ -168,6 +168,11 @@ const exportBackupPayload = async (): Promise<RuledBackupPayload> => {
   if (!created) throw new QuickConfigError('invalid')
 
   const payload = await readLocalBackupBase64(created.filename)
+  if (!payload || typeof payload.settings !== 'string') {
+    // 旧后端只返回一个 Base64 字符串，这种组合下 rules 必然为空，直接判为无效。
+    throw new QuickConfigError('invalid')
+  }
+
   return {
     settings: checkedBackupBody(payload.settings.replace(/\s+/gu, '')),
     rules: checkedRules(payload.rules),
