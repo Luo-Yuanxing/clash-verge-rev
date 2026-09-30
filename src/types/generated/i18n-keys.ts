@@ -350,6 +350,8 @@ export const translationKeys = [
   'proxies.components.enums.policies.REJECT-DROP',
   'proxies.components.enums.policies.PASS',
   'rules.custom.page.title',
+  'rules.custom.page.emptyProfile',
+  'rules.custom.page.emptyRules',
   'rules.page.provider.trigger',
   'rules.page.provider.dialogTitle',
   'rules.page.provider.actions.updateAll',

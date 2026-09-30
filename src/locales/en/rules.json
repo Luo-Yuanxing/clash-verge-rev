@@ -1,7 +1,9 @@
 {
   "custom": {
     "page": {
-      "title": "Custom Rules"
+      "title": "Custom Rules",
+      "emptyProfile": "No profile has a custom rules file yet",
+      "emptyRules": "No custom rules in this profile yet"
     }
   },
   "page": {

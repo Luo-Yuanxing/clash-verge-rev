@@ -1,77 +1,50 @@
-import { Box } from '@mui/material'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Box, Chip } from '@mui/material'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { Rule } from 'tauri-plugin-mihomo-api'
 
-import {
-  BaseEmpty,
-  BasePage,
-  BaseSearchBox,
-  VirtualList,
-  type VirtualListHandle,
-} from '@/components/base'
-import { ScrollTopButton } from '@/components/layout/scroll-top-button'
-import RuleItem from '@/components/rule/rule-item'
+import { BaseEmpty, BasePage } from '@/components/base'
+import { SeqRulesView } from '@/components/profile/seq-rules-view'
+import { useSeqRuleConfig } from '@/components/profile/use-seq-rule-config'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVisibility } from '@/hooks/use-visibility'
 
-// Rule flags may follow the proxy policy, e.g. "DOMAIN-SUFFIX,a.com,PROXY,no-resolve".
-const TRAILING_MARKERS = new Set(['no-resolve', 'src'])
-
-const toRuleItem = (line: string, index: number): Rule & { lineNo: number } => {
-  const parts = line.split(',')
-  while (
-    parts.length > 2 &&
-    TRAILING_MARKERS.has(parts[parts.length - 1].trim().toLowerCase())
-  ) {
-    parts.pop()
-  }
-
-  const proxy = parts.length > 1 ? (parts.pop() ?? '').trim() : ''
-  const type = (parts.shift() ?? '').trim()
-
-  return {
-    type: { Unknown: type },
-    index,
-    payload: parts.join(',').trim(),
-    proxy,
-    size: 0,
-    lineNo: index + 1,
-  }
-}
-
 const CustomRulesPage = () => {
   const { t } = useTranslation()
-  const { current, mutateProfiles } = useProfiles()
+  const { profiles, current, mutateProfiles } = useProfiles()
   const pageVisible = useVisibility()
-  const [match, setMatch] = useState(() => (_: string) => true)
-  const virtuosoRef = useRef<VirtualListHandle>(null)
-  const [showScrollTop, setShowScrollTop] = useState(false)
+
+  const items = useMemo(
+    () =>
+      (profiles?.items ?? []).filter(
+        (item): item is IProfileItem => !!item && !!item.option?.rules,
+      ),
+    [profiles],
+  )
+
+  const [pickedUid, setPickedUid] = useState('')
 
   useEffect(() => {
     void mutateProfiles()
   }, [mutateProfiles, pageVisible])
 
-  const rules = useMemo(() => {
-    return (current?.option?.rules ?? '')
-      .split(/\r?\n/u)
-      .map((line) => line.trim())
-      .filter((line) => line !== '' && !line.startsWith('#'))
-      .map(toRuleItem)
-  }, [current])
+  const selectedUid =
+    pickedUid && items.some((item) => item.uid === pickedUid)
+      ? pickedUid
+      : (items.find((item) => item.uid === current?.uid)?.uid ??
+        items[0]?.uid ??
+        '')
 
-  const filteredRules = useMemo(
-    () => rules.filter((rule) => match(rule.payload) || match(rule.proxy)),
-    [rules, match],
-  )
+  const selected = items.find((item) => item.uid === selectedUid)
 
-  const handleScroll = useCallback((e: Event) => {
-    setShowScrollTop((e.target as HTMLElement).scrollTop > 100)
-  }, [])
-
-  const scrollToTop = () => {
-    virtuosoRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  const {
+    visualization,
+    match,
+    setMatch,
+    prependSeq,
+    appendSeq,
+    deleteSeq,
+    ruleList,
+  } = useSeqRuleConfig(selected?.option?.rules ?? '', !!selected)
 
   return (
     <BasePage
@@ -81,7 +54,7 @@ const CustomRulesPage = () => {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'auto',
+        overflow: 'hidden',
       }}
     >
       <Box
@@ -89,28 +62,66 @@ const CustomRulesPage = () => {
           pt: 1,
           mb: 0.5,
           mx: '10px',
-          height: '36px',
+          minHeight: '36px',
           display: 'flex',
           alignItems: 'center',
+          gap: 1,
+          overflowX: 'auto',
+          flexShrink: 0,
         }}
       >
-        <BaseSearchBox onSearch={(match) => setMatch(() => match)} />
+        {items.map((item) => (
+          <Chip
+            key={item.uid}
+            clickable
+            size="small"
+            color={item.uid === selectedUid ? 'primary' : 'default'}
+            variant={item.uid === selectedUid ? 'filled' : 'outlined'}
+            label={item.name ?? item.uid}
+            onClick={() => setPickedUid(item.uid)}
+            sx={{ flexShrink: 0, maxWidth: '240px' }}
+          />
+        ))}
       </Box>
 
-      {filteredRules.length > 0 ? (
-        <>
-          <VirtualList
-            ref={virtuosoRef}
-            count={filteredRules.length}
-            estimateSize={40}
-            renderItem={(i) => <RuleItem value={filteredRules[i]} />}
-            style={{ flex: 1 }}
-            onScroll={handleScroll}
+      {selected && visualization ? (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            px: '10px',
+            pb: 1,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <SeqRulesView
+            prependSeq={prependSeq}
+            appendSeq={appendSeq}
+            deleteSeq={deleteSeq}
+            ruleList={ruleList}
+            match={match}
+            onMatchChange={setMatch}
           />
-          <ScrollTopButton onClick={scrollToTop} show={showScrollTop} />
-        </>
+        </Box>
       ) : (
-        <BaseEmpty />
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <BaseEmpty
+            textKey={
+              items.length === 0
+                ? 'rules.custom.page.emptyProfile'
+                : 'rules.custom.page.emptyRules'
+            }
+          />
+        </Box>
       )}
     </BasePage>
   )

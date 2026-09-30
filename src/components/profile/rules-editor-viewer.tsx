@@ -18,15 +18,7 @@ import {
   styled,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import * as yaml from 'js-yaml'
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox, MonacoEditor, Switch } from '@/components/base'
@@ -46,6 +38,8 @@ import {
   type GroupedVirtualItem,
   GroupedVirtualList,
 } from './grouped-virtual-list'
+import { SeqRulesView } from './seq-rules-view'
+import { useSeqRuleConfig } from './use-seq-rule-config'
 
 interface Props {
   groupsUid: string
@@ -55,6 +49,7 @@ interface Props {
   open: boolean
   onClose: () => void
   onSave?: (prev?: string, curr?: string) => void
+  readOnly?: boolean
 }
 
 const portValidator = (value: string): boolean => {
@@ -256,31 +251,47 @@ const findRealIndex = (
 }
 
 export const RulesEditorViewer = (props: Props) => {
-  const { groupsUid, mergeUid, profileUid, property, open, onClose, onSave } =
-    props
+  const {
+    groupsUid,
+    mergeUid,
+    profileUid,
+    property,
+    open,
+    onClose,
+    onSave,
+    readOnly,
+  } = props
   const { t } = useTranslation()
   const themeMode = useThemeMode()
 
   const editorRef = useRef<MonacoEditorInstance | null>(null)
 
-  const [prevData, setPrevData] = useState('')
-  const [currData, setCurrData] = useState('')
-  const [visualization, setVisualization] = useState(true)
-  const [match, setMatch] = useState(() => (_: string) => true)
+  const {
+    prevData,
+    currData,
+    setCurrData,
+    visualization,
+    handleVisualizationToggle,
+    match,
+    setMatch,
+    prependSeq,
+    setPrependSeq,
+    appendSeq,
+    setAppendSeq,
+    deleteSeq,
+    setDeleteSeq,
+    ruleList,
+    setRuleList,
+    resetContent,
+  } = useSeqRuleConfig(property, open)
 
   const [ruleType, setRuleType] = useState<(typeof rules)[number]>(rules[0])
   const [ruleContent, setRuleContent] = useState('')
   const [noResolve, setNoResolve] = useState(false)
   const [proxyPolicy, setProxyPolicy] = useState(builtinProxyPolicies[0])
   const [proxyPolicyList, setProxyPolicyList] = useState<string[]>([])
-  const [ruleList, setRuleList] = useState<string[]>([])
   const [ruleSetList, setRuleSetList] = useState<string[]>([])
   const [subRuleList, setSubRuleList] = useState<string[]>([])
-
-  const [prependSeq, setPrependSeq] = useState<string[]>([])
-  const [appendSeq, setAppendSeq] = useState<string[]>([])
-  const [deleteSeq, setDeleteSeq] = useState<string[]>([])
-  const hasLoadedSeqConfigRef = useRef(false)
 
   const filteredPrependSeq = useMemo(
     () => prependSeq.filter((rule) => match(rule)),
@@ -315,6 +326,7 @@ export const RulesEditorViewer = (props: Props) => {
         <RuleItem
           type={isDeleted ? 'delete' : 'original'}
           ruleRaw={item}
+          readOnly={readOnly}
           onDelete={() => {
             if (isDeleted) {
               setDeleteSeq(deleteSeq.filter((v) => v !== item))
@@ -331,6 +343,7 @@ export const RulesEditorViewer = (props: Props) => {
         <RuleItem
           type="prepend"
           ruleRaw={item}
+          readOnly={readOnly}
           onDelete={() => {
             setPrependSeq(prependSeq.filter((v) => v !== item))
           }}
@@ -348,6 +361,7 @@ export const RulesEditorViewer = (props: Props) => {
       <RuleItem
         type="append"
         ruleRaw={item}
+        readOnly={readOnly}
         onDelete={() => {
           setAppendSeq(appendSeq.filter((v) => v !== item))
         }}
@@ -382,89 +396,6 @@ export const RulesEditorViewer = (props: Props) => {
 
     setList(arrayMove(list, activeRealIndex, overRealIndex))
   }
-
-  const fetchContent = useCallback(async () => {
-    hasLoadedSeqConfigRef.current = false
-    const data = await readProfileFile(property)
-    const obj = parseYamlSafe(data) as ISeqProfileConfig | null | undefined
-
-    setPrevData(data)
-    setCurrData(data)
-
-    if (obj === undefined) {
-      setVisualization(false)
-      return
-    }
-
-    setPrependSeq(obj?.prepend || [])
-    setAppendSeq(obj?.append || [])
-    setDeleteSeq(obj?.delete || [])
-    hasLoadedSeqConfigRef.current = true
-  }, [property])
-
-  const handleVisualizationToggle = () => {
-    if (visualization) {
-      setVisualization(false)
-      return
-    }
-
-    const obj = parseYamlSafe(currData) as ISeqProfileConfig | null | undefined
-    if (obj === undefined) {
-      hasLoadedSeqConfigRef.current = false
-      return
-    }
-
-    hasLoadedSeqConfigRef.current = true
-    startTransition(() => {
-      setPrependSeq(obj?.prepend ?? [])
-      setAppendSeq(obj?.append ?? [])
-      setDeleteSeq(obj?.delete ?? [])
-    })
-    setVisualization(true)
-  }
-
-  // 优化：异步处理大数据yaml.dump，避免UI卡死
-  useEffect(() => {
-    if (!hasLoadedSeqConfigRef.current) {
-      return
-    }
-
-    if (!(prependSeq && appendSeq && deleteSeq)) {
-      return
-    }
-
-    const serialize = () => {
-      if (!hasLoadedSeqConfigRef.current) {
-        return
-      }
-
-      try {
-        setCurrData(
-          yaml.dump(
-            { prepend: prependSeq, append: appendSeq, delete: deleteSeq },
-            { forceQuotes: true },
-          ),
-        )
-      } catch (error) {
-        showNotice.error(error ?? 'YAML dump error')
-      }
-    }
-    let idleId: number | undefined
-    let timeoutId: number | undefined
-    if (window.requestIdleCallback) {
-      idleId = window.requestIdleCallback(serialize)
-    } else {
-      timeoutId = window.setTimeout(serialize, 0)
-    }
-    return () => {
-      if (idleId !== undefined && window.cancelIdleCallback) {
-        window.cancelIdleCallback(idleId)
-      }
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId)
-      }
-    }
-  }, [prependSeq, appendSeq, deleteSeq])
 
   const fetchProfile = useCallback(async () => {
     const data = await readProfileFile(profileUid) // 原配置文件
@@ -537,13 +468,12 @@ export const RulesEditorViewer = (props: Props) => {
     setRuleSetList(Object.keys(ruleSet))
     setSubRuleList(Object.keys(subRule))
     setRuleList(rulesObj?.rules || [])
-  }, [groupsUid, mergeUid, profileUid])
+  }, [groupsUid, mergeUid, profileUid, setRuleList])
 
   useEffect(() => {
     if (!open) return
-    fetchContent()
-    fetchProfile()
-  }, [fetchContent, fetchProfile, open])
+    void fetchProfile()
+  }, [fetchProfile, open])
 
   useEffect(() => {
     return () => {
@@ -571,7 +501,7 @@ export const RulesEditorViewer = (props: Props) => {
   const handleSave = useLockFn(async () => {
     try {
       if (!(await saveProfileFile(property, currData))) {
-        await fetchContent()
+        await resetContent()
         onClose()
         return
       }
@@ -594,7 +524,7 @@ export const RulesEditorViewer = (props: Props) => {
       <DialogTitle>
         {
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            {t('rules.modals.editor.title')}
+            {readOnly ? property : t('rules.modals.editor.title')}
             <Box>
               <Button
                 variant="contained"
@@ -615,174 +545,189 @@ export const RulesEditorViewer = (props: Props) => {
       >
         {visualization ? (
           <>
-            <List
-              sx={{
-                width: '50%',
-                padding: '0 10px',
-              }}
-            >
-              <Item>
-                <ListItemText
-                  primary={t('rules.modals.editor.form.labels.type')}
-                />
-                <Autocomplete
-                  size="small"
-                  sx={{ minWidth: '240px' }}
-                  renderInput={(params) => <TextField {...params} />}
-                  options={rules}
-                  value={ruleType}
-                  getOptionLabel={(option) =>
-                    t(RULE_TYPE_LABEL_KEYS[option.name] ?? option.name)
-                  }
-                  renderOption={(props, option) => {
-                    const { key, ...optionProps } = props
-                    const label = t(
-                      RULE_TYPE_LABEL_KEYS[option.name] ?? option.name,
-                    )
-                    return (
-                      <li key={key} {...optionProps} title={label}>
-                        {label}
-                      </li>
-                    )
-                  }}
-                  onChange={(_, value) => value && setRuleType(value)}
-                />
-              </Item>
-              <Item
-                sx={{ display: !(ruleType.required ?? true) ? 'none' : '' }}
+            {!readOnly && (
+              <List
+                sx={{
+                  width: '50%',
+                  padding: '0 10px',
+                }}
               >
-                <ListItemText
-                  primary={t('rules.modals.editor.form.labels.content')}
-                />
-
-                {ruleType.name === 'RULE-SET' && (
-                  <Autocomplete
-                    size="small"
-                    sx={{ minWidth: '240px' }}
-                    renderInput={(params) => <TextField {...params} />}
-                    options={ruleSetList}
-                    value={ruleContent}
-                    onChange={(_, value) => value && setRuleContent(value)}
-                  />
-                )}
-                {ruleType.name === 'SUB-RULE' && (
-                  <Autocomplete
-                    size="small"
-                    sx={{ minWidth: '240px' }}
-                    renderInput={(params) => <TextField {...params} />}
-                    options={subRuleList}
-                    value={ruleContent}
-                    onChange={(_, value) => value && setRuleContent(value)}
-                  />
-                )}
-                {ruleType.name !== 'RULE-SET' &&
-                  ruleType.name !== 'SUB-RULE' && (
-                    <TextField
-                      autoComplete="new-password"
-                      size="small"
-                      sx={{ minWidth: '240px' }}
-                      slotProps={{
-                        htmlInput: {
-                          autoCorrect: 'off',
-                          autoCapitalize: 'off',
-                          spellCheck: false,
-                        },
-                      }}
-                      value={ruleContent}
-                      required={ruleType.required ?? true}
-                      error={(ruleType.required ?? true) && !ruleContent}
-                      placeholder={ruleType.example}
-                      onChange={(e) => setRuleContent(e.target.value)}
-                    />
-                  )}
-              </Item>
-              <Item>
-                <ListItemText
-                  primary={t('rules.modals.editor.form.labels.proxyPolicy')}
-                />
-                <Autocomplete
-                  size="small"
-                  sx={{ minWidth: '240px' }}
-                  renderInput={(params) => <TextField {...params} />}
-                  options={proxyPolicyList}
-                  value={proxyPolicy}
-                  getOptionLabel={(option) =>
-                    t(PROXY_POLICY_LABEL_KEYS[option] ?? option)
-                  }
-                  renderOption={(props, option) => {
-                    const { key, ...optionProps } = props
-                    const label = t(PROXY_POLICY_LABEL_KEYS[option] ?? option)
-                    return (
-                      <li key={key} {...optionProps} title={label}>
-                        {label}
-                      </li>
-                    )
-                  }}
-                  onChange={(_, value) => value && setProxyPolicy(value)}
-                />
-              </Item>
-              {ruleType.noResolve && (
                 <Item>
                   <ListItemText
-                    primary={t('rules.modals.editor.form.toggles.noResolve')}
+                    primary={t('rules.modals.editor.form.labels.type')}
                   />
-                  <Switch
-                    checked={noResolve}
-                    onChange={() => setNoResolve(!noResolve)}
+                  <Autocomplete
+                    size="small"
+                    sx={{ minWidth: '240px' }}
+                    renderInput={(params) => <TextField {...params} />}
+                    options={rules}
+                    value={ruleType}
+                    getOptionLabel={(option) =>
+                      t(RULE_TYPE_LABEL_KEYS[option.name] ?? option.name)
+                    }
+                    renderOption={(props, option) => {
+                      const { key, ...optionProps } = props
+                      const label = t(
+                        RULE_TYPE_LABEL_KEYS[option.name] ?? option.name,
+                      )
+                      return (
+                        <li key={key} {...optionProps} title={label}>
+                          {label}
+                        </li>
+                      )
+                    }}
+                    onChange={(_, value) => value && setRuleType(value)}
                   />
                 </Item>
-              )}
-              <Item>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  startIcon={<VerticalAlignTopRounded />}
-                  onClick={() => {
-                    try {
-                      const raw = validateRule()
-                      if (prependSeq.includes(raw)) return
-                      setPrependSeq([raw, ...prependSeq])
-                    } catch (err: any) {
-                      showNotice.error(err)
-                    }
-                  }}
+                <Item
+                  sx={{ display: !(ruleType.required ?? true) ? 'none' : '' }}
                 >
-                  {t('rules.modals.editor.form.actions.prependRule')}
-                </Button>
-              </Item>
-              <Item>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  startIcon={<VerticalAlignBottomRounded />}
-                  onClick={() => {
-                    try {
-                      const raw = validateRule()
-                      if (appendSeq.includes(raw)) return
-                      setAppendSeq([...appendSeq, raw])
-                    } catch (err: any) {
-                      showNotice.error(err)
+                  <ListItemText
+                    primary={t('rules.modals.editor.form.labels.content')}
+                  />
+
+                  {ruleType.name === 'RULE-SET' && (
+                    <Autocomplete
+                      size="small"
+                      sx={{ minWidth: '240px' }}
+                      renderInput={(params) => <TextField {...params} />}
+                      options={ruleSetList}
+                      value={ruleContent}
+                      onChange={(_, value) => value && setRuleContent(value)}
+                    />
+                  )}
+                  {ruleType.name === 'SUB-RULE' && (
+                    <Autocomplete
+                      size="small"
+                      sx={{ minWidth: '240px' }}
+                      renderInput={(params) => <TextField {...params} />}
+                      options={subRuleList}
+                      value={ruleContent}
+                      onChange={(_, value) => value && setRuleContent(value)}
+                    />
+                  )}
+                  {ruleType.name !== 'RULE-SET' &&
+                    ruleType.name !== 'SUB-RULE' && (
+                      <TextField
+                        autoComplete="new-password"
+                        size="small"
+                        sx={{ minWidth: '240px' }}
+                        slotProps={{
+                          htmlInput: {
+                            autoCorrect: 'off',
+                            autoCapitalize: 'off',
+                            spellCheck: false,
+                          },
+                        }}
+                        value={ruleContent}
+                        required={ruleType.required ?? true}
+                        error={(ruleType.required ?? true) && !ruleContent}
+                        placeholder={ruleType.example}
+                        onChange={(e) => setRuleContent(e.target.value)}
+                      />
+                    )}
+                </Item>
+                <Item>
+                  <ListItemText
+                    primary={t('rules.modals.editor.form.labels.proxyPolicy')}
+                  />
+                  <Autocomplete
+                    size="small"
+                    sx={{ minWidth: '240px' }}
+                    renderInput={(params) => <TextField {...params} />}
+                    options={proxyPolicyList}
+                    value={proxyPolicy}
+                    getOptionLabel={(option) =>
+                      t(PROXY_POLICY_LABEL_KEYS[option] ?? option)
                     }
-                  }}
-                >
-                  {t('rules.modals.editor.form.actions.appendRule')}
-                </Button>
-              </Item>
-            </List>
+                    renderOption={(props, option) => {
+                      const { key, ...optionProps } = props
+                      const label = t(PROXY_POLICY_LABEL_KEYS[option] ?? option)
+                      return (
+                        <li key={key} {...optionProps} title={label}>
+                          {label}
+                        </li>
+                      )
+                    }}
+                    onChange={(_, value) => value && setProxyPolicy(value)}
+                  />
+                </Item>
+                {ruleType.noResolve && (
+                  <Item>
+                    <ListItemText
+                      primary={t('rules.modals.editor.form.toggles.noResolve')}
+                    />
+                    <Switch
+                      checked={noResolve}
+                      onChange={() => setNoResolve(!noResolve)}
+                    />
+                  </Item>
+                )}
+                <Item>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<VerticalAlignTopRounded />}
+                    onClick={() => {
+                      try {
+                        const raw = validateRule()
+                        if (prependSeq.includes(raw)) return
+                        setPrependSeq([raw, ...prependSeq])
+                      } catch (err: any) {
+                        showNotice.error(err)
+                      }
+                    }}
+                  >
+                    {t('rules.modals.editor.form.actions.prependRule')}
+                  </Button>
+                </Item>
+                <Item>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<VerticalAlignBottomRounded />}
+                    onClick={() => {
+                      try {
+                        const raw = validateRule()
+                        if (appendSeq.includes(raw)) return
+                        setAppendSeq([...appendSeq, raw])
+                      } catch (err: any) {
+                        showNotice.error(err)
+                      }
+                    }}
+                  >
+                    {t('rules.modals.editor.form.actions.appendRule')}
+                  </Button>
+                </Item>
+              </List>
+            )}
 
             <List
               sx={{
-                width: '50%',
+                width: readOnly ? '100%' : '50%',
                 padding: '0 10px',
               }}
             >
-              <BaseSearchBox onSearch={(match) => setMatch(() => match)} />
-              <GroupedVirtualList
-                items={items}
-                renderItem={renderItem}
-                onReorder={onReorder}
-                style={{ height: 'calc(100% - 24px)', marginTop: '8px' }}
-              />
+              {readOnly ? (
+                <SeqRulesView
+                  prependSeq={prependSeq}
+                  appendSeq={appendSeq}
+                  deleteSeq={deleteSeq}
+                  ruleList={ruleList}
+                  match={match}
+                  onMatchChange={setMatch}
+                />
+              ) : (
+                <>
+                  <BaseSearchBox onSearch={(match) => setMatch(() => match)} />
+                  <GroupedVirtualList
+                    items={items}
+                    renderItem={renderItem}
+                    onReorder={onReorder}
+                    style={{ height: 'calc(100% - 24px)', marginTop: '8px' }}
+                  />
+                </>
+              )}
             </List>
           </>
         ) : (
@@ -819,12 +764,14 @@ export const RulesEditorViewer = (props: Props) => {
 
       <DialogActions>
         <Button onClick={onClose} variant="outlined">
-          {t('shared.actions.cancel')}
+          {t(readOnly ? 'shared.actions.close' : 'shared.actions.cancel')}
         </Button>
 
-        <Button onClick={handleSave} variant="contained">
-          {t('shared.actions.save')}
-        </Button>
+        {!readOnly && (
+          <Button onClick={handleSave} variant="contained">
+            {t('shared.actions.save')}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   )

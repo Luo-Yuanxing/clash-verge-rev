@@ -1,7 +1,9 @@
 {
   "custom": {
     "page": {
-      "title": "自定义规则"
+      "title": "自定义规则",
+      "emptyProfile": "暂无订阅配置了自定义规则文件",
+      "emptyRules": "该订阅还没有自定义规则"
     }
   },
   "page": {

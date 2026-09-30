@@ -609,6 +609,8 @@ export interface TranslationResources {
     rules: {
       custom: {
         page: {
+          emptyProfile: string
+          emptyRules: string
           title: string
         }
       }
