@@ -5,7 +5,7 @@ import {
 } from '@mui/icons-material'
 import { Box, Button, Chip, Menu, MenuItem, Typography } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseEmpty, BasePage, BaseSearchBox, Switch } from '@/components/base'
@@ -178,8 +178,14 @@ const CustomRulesPage = () => {
     [prependSeq, appendSeq, deleteSeq, disabledSeq, excludeSubscriptionRules],
   )
 
+  /** 最近一次显示在界面上的草稿：判断后台写回失败时是否还能回滚 */
+  const draftRef = useRef<SeqRulesConfig>(draft)
+  /** 后台写回队列：连续操作串行落盘，避免两次写同一个文件互相覆盖 */
+  const writeQueueRef = useRef<Promise<unknown>>(Promise.resolve())
+
   /** 把草稿同步回本地状态 */
   const applyDraft = (next: SeqRulesConfig) => {
+    draftRef.current = next
     setPrependSeq(next.prepend)
     setAppendSeq(next.append)
     setDeleteSeq(next.delete)
@@ -187,8 +193,11 @@ const CustomRulesPage = () => {
     setExcludeSubscriptionRules(next.excludeSubscriptionRules)
   }
 
-  /** 写回文件；校验失败时后端已回滚并提示，本地草稿保持不变 */
-  const saveDraft = async (next: SeqRulesConfig) => {
+  /**
+   * 落盘：校验失败或异常时回到写之前的草稿（后端已回滚文件）。
+   * 已经被更新的草稿取代时不回滚、不重启、不提示，交给最后那次写回处理。
+   */
+  const persistDraft = async (next: SeqRulesConfig, prev: SeqRulesConfig) => {
     if (!rulesProperty) return false
 
     try {
@@ -197,12 +206,16 @@ const CustomRulesPage = () => {
         serializeSeqRules(next),
       )
 
-      if (outcome.status !== 'valid') return false
+      if (outcome.status !== 'valid') {
+        if (draftRef.current === next) applyDraft(prev)
+        return false
+      }
+
+      if (draftRef.current !== next) return true
 
       // mihomo 的热重载不一定采用新规则，保存后显式重启内核
       await restartCore()
 
-      applyDraft(next)
       setSavedSeq(next)
       setDirtyUid('')
 
@@ -217,9 +230,23 @@ const CustomRulesPage = () => {
 
       return true
     } catch (err: any) {
+      if (draftRef.current === next) applyDraft(prev)
       showNotice.error(err)
       return false
     }
+  }
+
+  /**
+   * 先更新界面再串行落盘：删除 / 排序 / 开关立即生效，写回与内核重启在后台完成。
+   * 草稿里有未保存的勾选改动时一并写回，成功后才清掉未保存标记。
+   */
+  const saveDraft = (next: SeqRulesConfig) => {
+    const prev = draftRef.current
+    if (prev !== next) applyDraft(next)
+
+    const task = writeQueueRef.current.then(() => persistDraft(next, prev))
+    writeQueueRef.current = task.catch(() => undefined)
+    return task
   }
 
   /** 勾选即启用：只改本地草稿，等保存按钮统一写回 */
@@ -230,10 +257,10 @@ const CustomRulesPage = () => {
     setDirtyUid(selectedUid)
   }
 
-  /** 删除单条自定义规则，连同未保存的勾选改动一起写回 */
-  const handleDeleteRule = useLockFn(async (row: SeqRuleRow) => {
-    await saveDraft(removeSeqRule(draft, row))
-  })
+  /** 删除单条自定义规则：先从列表移除，连同未保存的勾选改动一起在后台写回 */
+  const handleDeleteRule = (row: SeqRuleRow) => {
+    void saveDraft(removeSeqRule(draftRef.current, row))
+  }
 
   /** 编辑规则属性：原位置的规则改成新规则，重复的旧规则一并排除，只改本地草稿 */
   const handleEditRule = (row: SeqRuleRow, nextRule: string) => {
@@ -462,9 +489,7 @@ const CustomRulesPage = () => {
                 onVisibilityChange={setVisibility}
                 onToggle={handleToggleRules}
                 onEdit={handleEditRule}
-                onDelete={(row) => {
-                  void handleDeleteRule(row)
-                }}
+                onDelete={handleDeleteRule}
                 onReorder={(source, from, to) => {
                   void handleReorderRule(source, from, to)
                 }}
