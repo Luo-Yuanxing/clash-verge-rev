@@ -25,6 +25,7 @@ export const translationKeys = [
   'connections.components.actions.resume',
   'connections.components.actions.createRule',
   'connections.components.history.window',
+  'connections.components.history.excludeIp',
   'connections.components.chains.all',
   'connections.components.chains.filter',
   'connections.components.covered.show',

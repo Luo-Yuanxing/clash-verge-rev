@@ -207,6 +207,8 @@ interface IConnectionSetting {
   layout: 'table' | 'list'
   /** Rolling window of the connection history, in milliseconds */
   historyWindowMs?: number
+  /** Hide history rows whose target is a bare IP address */
+  excludeIpConnections?: boolean
 }
 
 interface IClashInfo {

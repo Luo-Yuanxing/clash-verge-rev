@@ -31,7 +31,8 @@
       "createRule": "创建规则"
     },
     "history": {
-      "window": "{{count}} 分钟"
+      "window": "{{count}} 分钟",
+      "excludeIp": "排除 IP 连接"
     },
     "chains": {
       "all": "全部链路",

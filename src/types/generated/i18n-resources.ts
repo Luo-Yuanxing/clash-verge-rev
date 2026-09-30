@@ -40,6 +40,7 @@ export interface TranslationResources {
           ulSpeed: string
         }
         history: {
+          excludeIp: string
           window: string
         }
         order: {

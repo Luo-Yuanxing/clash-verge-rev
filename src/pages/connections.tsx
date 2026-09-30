@@ -13,7 +13,9 @@ import {
   Box,
   Button,
   ButtonGroup,
+  Checkbox,
   Fab,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Tooltip,
@@ -99,6 +101,14 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
 )
 
 const EMPTY_CONNECTIONS: IConnectionsItem[] = []
+
+/** 目标是不是裸 IP：没有主机名，或主机名本身就是 IP */
+const isIpConnection = (connection: IConnectionsItem) => {
+  const { host, destinationIP, remoteDestination } = connection.metadata
+  const target =
+    host.trim() || destinationIP?.trim() || remoteDestination?.trim() || ''
+  return Boolean(target) && isIpAddress(target)
+}
 const ConnectionsPage = () => {
   const { t } = useTranslation()
   const pageVisible = useVisibility()
@@ -128,6 +138,8 @@ const ConnectionsPage = () => {
   const isHostCovered = useCustomRuleCoverage(pageVisible)
 
   const historyWindowMs = setting.historyWindowMs ?? DEFAULT_HISTORY_WINDOW_MS
+  /** 默认排除裸 IP 的历史记录 */
+  const excludeIpConnections = setting.excludeIpConnections ?? true
 
   useEffect(() => {
     setConnectionHistoryWindow(historyWindowMs)
@@ -156,20 +168,28 @@ const ConnectionsPage = () => {
     historyConnections: [],
   })
 
+  /** 历史列表：可选排除裸 IP 记录，再按主机压缩（连接时间取最近、流量累加） */
+  const historyConnections = useMemo(() => {
+    const source = connections?.historyConnections ?? EMPTY_CONNECTIONS
+    return mergeHistoryConnections(
+      excludeIpConnections
+        ? source.filter((connection) => !isIpConnection(connection))
+        : source,
+    )
+  }, [connections, excludeIpConnections])
+
   const togglePause = useCallback(() => {
     if (!paused) {
       frozenRef.current = {
         activeConnections: connections?.activeConnections ?? EMPTY_CONNECTIONS,
         closedConnections: connections?.closedConnections ?? EMPTY_CONNECTIONS,
-        historyConnections: mergeHistoryConnections(
-          connections?.historyConnections ?? EMPTY_CONNECTIONS,
-        ),
+        historyConnections,
       }
       setPaused(true)
       return
     }
     setPaused(false)
-  }, [paused, connections])
+  }, [paused, connections, historyConnections])
 
   useInterval(
     () => pruneConnectionHistory(),
@@ -185,12 +205,9 @@ const ConnectionsPage = () => {
               connections?.activeConnections ?? EMPTY_CONNECTIONS,
             closedConnections:
               connections?.closedConnections ?? EMPTY_CONNECTIONS,
-            // 历史列表按主机压缩，连接时间取最近一次，流量累加
-            historyConnections: mergeHistoryConnections(
-              connections?.historyConnections ?? EMPTY_CONNECTIONS,
-            ),
+            historyConnections,
           },
-    [paused, connections],
+    [paused, connections, historyConnections],
   )
 
   const selectedConnections =
@@ -457,6 +474,29 @@ const ConnectionsPage = () => {
               </MenuItem>
             ))}
           </BaseStyledSelect>
+        )}
+        {connectionsType === 'history' && (
+          <FormControlLabel
+            sx={{ mr: 0.5, flex: '0 0 auto', whiteSpace: 'nowrap' }}
+            control={
+              <Checkbox
+                size="small"
+                checked={excludeIpConnections}
+                onChange={(e) =>
+                  setSetting((o) => ({
+                    layout: o?.layout ?? 'table',
+                    ...o,
+                    excludeIpConnections: e.target.checked,
+                  }))
+                }
+              />
+            }
+            label={
+              <span style={{ fontSize: 13 }}>
+                {t('connections.components.history.excludeIp')}
+              </span>
+            }
+          />
         )}
         {connectionsType === 'history' && (
           <Tooltip

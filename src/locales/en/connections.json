@@ -31,7 +31,8 @@
       "createRule": "Create rules"
     },
     "history": {
-      "window": "{{count}} min"
+      "window": "{{count}} min",
+      "excludeIp": "Exclude IP"
     },
     "chains": {
       "all": "All chains",

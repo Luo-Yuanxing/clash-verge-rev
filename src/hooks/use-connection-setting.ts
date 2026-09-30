@@ -13,6 +13,7 @@ export const HISTORY_WINDOW_OPTIONS = [
 const defaultConnectionSetting: IConnectionSetting = {
   layout: 'table',
   historyWindowMs: DEFAULT_HISTORY_WINDOW_MS,
+  excludeIpConnections: true,
 }
 
 export const useConnectionSetting = () =>
