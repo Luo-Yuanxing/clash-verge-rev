@@ -75,10 +75,10 @@
         }
       },
       "ruleTypes": {
-        "DOMAIN": "Match full domain (DOMAIN)",
-        "DOMAIN-SUFFIX": "Match domain suffix (DOMAIN-SUFFIX)",
-        "DOMAIN-KEYWORD": "Match domain keyword (DOMAIN-KEYWORD)",
-        "DOMAIN-REGEX": "Match domain using regex (DOMAIN-REGEX)",
+        "DOMAIN": "Full domain (DOMAIN)",
+        "DOMAIN-SUFFIX": "Domain suffix (DOMAIN-SUFFIX)",
+        "DOMAIN-KEYWORD": "Domain keyword (DOMAIN-KEYWORD)",
+        "DOMAIN-REGEX": "Domain regex (DOMAIN-REGEX)",
         "GEOSITE": "Match domains in GeoSite (GEOSITE)",
         "GEOIP": "Match IP country code (GEOIP)",
         "SRC-GEOIP": "Match source IP country code (SRC-GEOIP)",

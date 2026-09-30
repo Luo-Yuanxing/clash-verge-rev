@@ -75,10 +75,10 @@
         }
       },
       "ruleTypes": {
-        "DOMAIN": "匹配完整域名 (DOMAIN)",
-        "DOMAIN-SUFFIX": "匹配域名后缀 (DOMAIN-SUFFIX)",
-        "DOMAIN-KEYWORD": "匹配域名关键字 (DOMAIN-KEYWORD)",
-        "DOMAIN-REGEX": "匹配域名正则表达式 (DOMAIN-REGEX)",
+        "DOMAIN": "完整域名 (DOMAIN)",
+        "DOMAIN-SUFFIX": "域名后缀 (DOMAIN-SUFFIX)",
+        "DOMAIN-KEYWORD": "域名关键字 (DOMAIN-KEYWORD)",
+        "DOMAIN-REGEX": "域名正则表达式 (DOMAIN-REGEX)",
         "GEOSITE": "匹配 GeoSite 内的域名 (GEOSITE)",
         "GEOIP": "匹配 IP 所属国家代码 (GEOIP)",
         "SRC-GEOIP": "匹配来源 IP 所属国家代码 (SRC-GEOIP)",
