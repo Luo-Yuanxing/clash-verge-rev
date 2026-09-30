@@ -54,6 +54,7 @@ interface GroupedVirtualListProps<T> {
     overIndex: number,
   ) => void
   style?: CSSProperties
+  readOnly?: boolean
 }
 
 /**
@@ -66,6 +67,7 @@ export function GroupedVirtualList<T>(props: GroupedVirtualListProps<T>) {
     renderItem,
     onReorder,
     style,
+    readOnly,
   } = props
   const [items, setItems] = useState(itemsProp)
   const [prevItemsProp, setPrevItemsProp] = useState(itemsProp)
@@ -163,7 +165,7 @@ export function GroupedVirtualList<T>(props: GroupedVirtualListProps<T>) {
                 key={vi.key}
                 id={entry.id}
                 index={vi.index}
-                disabled={entry.category === 'original'}
+                disabled={readOnly || entry.category === 'original'}
                 measureElement={virtualizer.measureElement}
                 dataIndex={vi.index}
                 style={{

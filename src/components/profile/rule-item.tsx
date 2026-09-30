@@ -19,11 +19,12 @@ interface Props {
   onDelete: () => void
   onPrepend?: () => void
   onAppend?: () => void
+  readOnly?: boolean
 }
 
 export const RuleItem = (props: Props) => {
-  const { type, ruleRaw, onDelete, onPrepend, onAppend } = props
-  const isSortable = type === 'prepend' || type === 'append'
+  const { type, ruleRaw, onDelete, onPrepend, onAppend, readOnly } = props
+  const isSortable = !readOnly && (type === 'prepend' || type === 'append')
   const rule = ruleRaw.replace(',no-resolve', '')
 
   const ruleType = rule.match(/^[^,]+/)?.[0] ?? ''
@@ -86,19 +87,21 @@ export const RuleItem = (props: Props) => {
           },
         }}
       />
-      {type === 'prepend' && (
+      {!readOnly && type === 'prepend' && (
         <IconButton onClick={onAppend}>
           <VerticalAlignBottomRounded />
         </IconButton>
       )}
-      {type === 'append' && (
+      {!readOnly && type === 'append' && (
         <IconButton onClick={onPrepend}>
           <VerticalAlignTopRounded />
         </IconButton>
       )}
-      <IconButton onClick={onDelete}>
-        {type === 'delete' ? <UndoRounded /> : <DeleteForeverRounded />}
-      </IconButton>
+      {!readOnly && (
+        <IconButton onClick={onDelete}>
+          {type === 'delete' ? <UndoRounded /> : <DeleteForeverRounded />}
+        </IconButton>
+      )}
     </ListItem>
   )
 }
