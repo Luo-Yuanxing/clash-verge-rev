@@ -26,7 +26,7 @@ import {
   toSeqConfig,
 } from '@/components/profile/seq-rules-document'
 import { useProfiles } from '@/hooks/use-profiles'
-import { saveProfileFile } from '@/services/cmds'
+import { restartCore, saveProfileFile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
 const RULE_TYPES = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD'] as const
@@ -209,6 +209,9 @@ export const ConnectionRuleDialog = (props: Props) => {
         )
         return
       }
+
+      // 新增的规则要重启内核才会生效
+      await restartCore().catch((err) => showNotice.error(err))
 
       showNotice.success(
         t('connections.components.ruleDialog.notifications.created', {
