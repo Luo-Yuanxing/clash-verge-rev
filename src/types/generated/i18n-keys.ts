@@ -378,6 +378,8 @@ export const translationKeys = [
   'rules.custom.page.columns.host',
   'rules.custom.page.columns.type',
   'rules.custom.page.columns.policy',
+  'rules.custom.page.visibility.enabled',
+  'rules.custom.page.visibility.disabled',
   'rules.custom.page.order.byDomain',
   'rules.custom.page.order.original',
   'rules.page.provider.trigger',

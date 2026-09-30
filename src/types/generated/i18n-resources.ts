@@ -660,6 +660,10 @@ export interface TranslationResources {
             original: string
           }
           title: string
+          visibility: {
+            disabled: string
+            enabled: string
+          }
         }
       }
       feedback: {

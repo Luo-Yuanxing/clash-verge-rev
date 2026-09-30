@@ -14,6 +14,10 @@
         "type": "Rule type",
         "policy": "Proxy policy"
       },
+      "visibility": {
+        "enabled": "Show enabled",
+        "disabled": "Show disabled"
+      },
       "order": {
         "byDomain": "Sort by domain level",
         "original": "Show original order"

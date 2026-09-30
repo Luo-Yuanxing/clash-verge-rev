@@ -19,6 +19,7 @@ import {
   type SeqRuleRow,
   type SeqRuleSource,
   SeqRulesTable,
+  type SeqRuleVisibility,
 } from '@/components/profile/seq-rules-table'
 import { useSeqRuleConfig } from '@/components/profile/use-seq-rule-config'
 import { useProfiles } from '@/hooks/use-profiles'
@@ -44,6 +45,8 @@ const CustomRulesPage = () => {
   const [autoUid, setAutoUid] = useState('')
   /** 默认按域名层级排序，可切回规则命中的原始顺序 */
   const [order, setOrder] = useState<'domain' | 'original'>('domain')
+  /** 列表只显示启用中的规则，或只显示已关闭的规则 */
+  const [visibility, setVisibility] = useState<SeqRuleVisibility>('enabled')
 
   useEffect(() => {
     void mutateProfiles()
@@ -87,6 +90,8 @@ const CustomRulesPage = () => {
     setPrependSeq,
     appendSeq,
     setAppendSeq,
+    disabledSeq,
+    setDisabledSeq,
     excludeSubscriptionRules,
     setExcludeSubscriptionRules,
   } = useSeqRuleConfig(selected?.option?.rules ?? '', !!selected)
@@ -95,54 +100,151 @@ const CustomRulesPage = () => {
 
   const rows = useMemo<SeqRuleRow[]>(
     () => [
-      ...prependSeq.map((rule) => ({ rule, source: 'prepend' as const })),
-      ...appendSeq.map((rule) => ({ rule, source: 'append' as const })),
+      ...prependSeq.map((rule) => ({
+        rule,
+        source: 'prepend' as const,
+        enabled: true,
+      })),
+      ...appendSeq.map((rule) => ({
+        rule,
+        source: 'append' as const,
+        enabled: true,
+      })),
+      ...disabledSeq.prepend.map((rule) => ({
+        rule,
+        source: 'prepend' as const,
+        enabled: false,
+      })),
+      ...disabledSeq.append.map((rule) => ({
+        rule,
+        source: 'append' as const,
+        enabled: false,
+      })),
     ],
-    [prependSeq, appendSeq],
+    [prependSeq, appendSeq, disabledSeq],
   )
 
   const filteredRows = useMemo(() => {
-    const matched = rows.filter(({ rule }) => match(rule))
+    const matched = rows.filter(
+      ({ rule, enabled }) =>
+        (visibility === 'enabled' ? enabled : !enabled) && match(rule),
+    )
     // 原始顺序即规则命中的顺序（prepend → append）
     if (order === 'original') return matched
 
     return [...matched].sort((a, b) => compareRulesByHostLevel(a.rule, b.rule))
-  }, [rows, match, order])
+  }, [rows, match, order, visibility])
+
+  /** 勾选即启用：关闭的规则移入 disabled，不再写进 prepend/append */
+  const handleToggleRules = useLockFn(
+    async (targets: SeqRuleRow[], enabled: boolean) => {
+      if (!rulesProperty || targets.length === 0) return
+
+      try {
+        const { config } = await readSeqRulesDocument(rulesProperty)
+        const current = toSeqConfig(config)
+        const nextPrepend = [...current.prepend]
+        const nextAppend = [...current.append]
+        const nextDisabled = {
+          prepend: [...current.disabled.prepend],
+          append: [...current.disabled.append],
+        }
+
+        for (const { rule, source } of targets) {
+          const sequence = source === 'prepend' ? nextPrepend : nextAppend
+          const closed =
+            source === 'prepend' ? nextDisabled.prepend : nextDisabled.append
+
+          if (enabled) {
+            const index = closed.indexOf(rule)
+            if (index >= 0) closed.splice(index, 1)
+            if (!sequence.includes(rule)) sequence.push(rule)
+          } else {
+            for (let i = sequence.length - 1; i >= 0; i -= 1) {
+              if (sequence[i] === rule) sequence.splice(i, 1)
+            }
+            if (!closed.includes(rule)) closed.push(rule)
+          }
+        }
+
+        const saved = await saveProfileFile(
+          rulesProperty,
+          serializeSeqRules({
+            ...current,
+            prepend: nextPrepend,
+            append: nextAppend,
+            disabled: nextDisabled,
+          }),
+        )
+
+        // 校验失败时后端已回滚并提示，这里保持原状
+        if (!saved) return
+
+        setPrependSeq(nextPrepend)
+        setAppendSeq(nextAppend)
+        setDisabledSeq(nextDisabled)
+      } catch (err: any) {
+        showNotice.error(err)
+      }
+    },
+  )
 
   /** 删除单条自定义规则并写回文件 */
-  const handleDeleteRule = useLockFn(async ({ rule, source }: SeqRuleRow) => {
-    if (!rulesProperty) return
+  const handleDeleteRule = useLockFn(
+    async ({ rule, source, enabled }: SeqRuleRow) => {
+      if (!rulesProperty) return
 
-    try {
-      const { config } = await readSeqRulesDocument(rulesProperty)
-      const current = toSeqConfig(config)
-      const nextPrepend =
-        source === 'prepend'
-          ? current.prepend.filter((item) => item !== rule)
-          : current.prepend
-      const nextAppend =
-        source === 'append'
-          ? current.append.filter((item) => item !== rule)
-          : current.append
+      try {
+        const { config } = await readSeqRulesDocument(rulesProperty)
+        const current = toSeqConfig(config)
+        const nextDisabled = {
+          prepend: [...current.disabled.prepend],
+          append: [...current.disabled.append],
+        }
 
-      const saved = await saveProfileFile(
-        rulesProperty,
-        serializeSeqRules({
-          ...current,
-          prepend: nextPrepend,
-          append: nextAppend,
-        }),
-      )
+        let nextPrepend = current.prepend
+        let nextAppend = current.append
 
-      // 校验失败时后端已回滚并提示
-      if (!saved) return
+        if (enabled) {
+          nextPrepend =
+            source === 'prepend'
+              ? current.prepend.filter((item) => item !== rule)
+              : current.prepend
+          nextAppend =
+            source === 'append'
+              ? current.append.filter((item) => item !== rule)
+              : current.append
+        } else if (source === 'prepend') {
+          nextDisabled.prepend = nextDisabled.prepend.filter(
+            (item) => item !== rule,
+          )
+        } else {
+          nextDisabled.append = nextDisabled.append.filter(
+            (item) => item !== rule,
+          )
+        }
 
-      setPrependSeq(nextPrepend)
-      setAppendSeq(nextAppend)
-    } catch (err: any) {
-      showNotice.error(err)
-    }
-  })
+        const saved = await saveProfileFile(
+          rulesProperty,
+          serializeSeqRules({
+            ...current,
+            prepend: nextPrepend,
+            append: nextAppend,
+            disabled: nextDisabled,
+          }),
+        )
+
+        // 校验失败时后端已回滚并提示
+        if (!saved) return
+
+        setPrependSeq(nextPrepend)
+        setAppendSeq(nextAppend)
+        setDisabledSeq(nextDisabled)
+      } catch (err: any) {
+        showNotice.error(err)
+      }
+    },
+  )
 
   /** 拖动排序后立即写回文件 */
   const handleReorderRule = useLockFn(
@@ -187,7 +289,12 @@ const CustomRulesPage = () => {
 
     try {
       const { config } = await readSeqRulesDocument(rulesProperty)
-      const { prepend, append, delete: deleteList } = toSeqConfig(config)
+      const {
+        prepend,
+        append,
+        delete: deleteList,
+        disabled,
+      } = toSeqConfig(config)
 
       const saved = await saveProfileFile(
         rulesProperty,
@@ -195,6 +302,7 @@ const CustomRulesPage = () => {
           prepend,
           append,
           delete: deleteList,
+          disabled,
           excludeSubscriptionRules: next,
         }),
       )
@@ -305,6 +413,11 @@ const CustomRulesPage = () => {
               <SeqRulesTable
                 rows={filteredRows}
                 sortable={order === 'original'}
+                visibility={visibility}
+                onVisibilityChange={setVisibility}
+                onToggle={(targets, enabled) => {
+                  void handleToggleRules(targets, enabled)
+                }}
                 onDelete={(row) => {
                   void handleDeleteRule(row)
                 }}
