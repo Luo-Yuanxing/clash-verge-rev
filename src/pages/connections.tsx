@@ -17,8 +17,8 @@ import {
   Tooltip,
   Zoom,
 } from '@mui/material'
-import { useLockFn } from 'ahooks'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useLockFn, useInterval } from 'ahooks'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
@@ -41,8 +41,16 @@ import {
 } from '@/components/connection/connection-row-view'
 import { ConnectionRuleDialog } from '@/components/connection/connection-rule-dialog'
 import { ConnectionTable } from '@/components/connection/connection-table'
-import { useConnectionData } from '@/hooks/use-connection-data'
-import { useConnectionSetting } from '@/hooks/use-connection-setting'
+import {
+  DEFAULT_HISTORY_WINDOW_MS,
+  pruneConnectionHistory,
+  setConnectionHistoryWindow,
+  useConnectionData,
+} from '@/hooks/use-connection-data'
+import {
+  HISTORY_WINDOW_OPTIONS,
+  useConnectionSetting,
+} from '@/hooks/use-connection-setting'
 import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVisibility } from '@/hooks/use-visibility'
 import { isIpAddress } from '@/utils/network'
@@ -75,6 +83,8 @@ const ORDER_OPTIONS = [
 
 type OrderKey = (typeof ORDER_OPTIONS)[number]['id']
 
+type ConnectionsType = 'active' | 'closed' | 'history'
+
 const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
   (acc, option) => {
     acc[option.id] = option.fn
@@ -92,19 +102,29 @@ const ConnectionsPage = () => {
   )
   const [hasSearch, setHasSearch] = useState(false)
   const [curOrderOpt, setCurOrderOpt] = useState<OrderKey>('default')
-  const [connectionsType, setConnectionsType] = useState<'active' | 'closed'>(
-    'active',
-  )
+  const [connectionsType, setConnectionsType] =
+    useState<ConnectionsType>('active')
 
   const {
     response: { data: connections },
     clearClosedConnections,
+    clearHistoryConnections,
   } = useConnectionData({ enabled: pageVisible })
   const {
     response: { data: traffic },
   } = useTrafficData({ enabled: pageVisible })
 
   const [setting, setSetting] = useConnectionSetting()
+
+  const historyWindowMs = setting.historyWindowMs ?? DEFAULT_HISTORY_WINDOW_MS
+
+  useEffect(() => {
+    setConnectionHistoryWindow(historyWindowMs)
+  }, [historyWindowMs])
+
+  useEffect(() => {
+    pruneConnectionHistory()
+  }, [])
 
   const isTableLayout = setting.layout === 'table'
 
@@ -118,19 +138,31 @@ const ConnectionsPage = () => {
   const frozenRef = useRef<{
     activeConnections: IConnectionsItem[]
     closedConnections: IConnectionsItem[]
-  }>({ activeConnections: [], closedConnections: [] })
+    historyConnections: IConnectionsItem[]
+  }>({
+    activeConnections: [],
+    closedConnections: [],
+    historyConnections: [],
+  })
 
   const togglePause = useCallback(() => {
     if (!paused) {
       frozenRef.current = {
         activeConnections: connections?.activeConnections ?? EMPTY_CONNECTIONS,
         closedConnections: connections?.closedConnections ?? EMPTY_CONNECTIONS,
+        historyConnections:
+          connections?.historyConnections ?? EMPTY_CONNECTIONS,
       }
       setPaused(true)
       return
     }
     setPaused(false)
   }, [paused, connections])
+
+  useInterval(
+    () => pruneConnectionHistory(),
+    connectionsType === 'history' && !paused ? 1_000 : undefined,
+  )
 
   const viewConnections = useMemo(
     () =>
@@ -141,14 +173,24 @@ const ConnectionsPage = () => {
               connections?.activeConnections ?? EMPTY_CONNECTIONS,
             closedConnections:
               connections?.closedConnections ?? EMPTY_CONNECTIONS,
+            historyConnections:
+              connections?.historyConnections ?? EMPTY_CONNECTIONS,
           },
     [paused, connections],
   )
 
   const selectedConnections =
-    connectionsType === 'active'
-      ? viewConnections.activeConnections
-      : viewConnections.closedConnections
+    connectionsType === 'history'
+      ? viewConnections.historyConnections
+      : connectionsType === 'closed'
+        ? viewConnections.closedConnections
+        : viewConnections.activeConnections
+
+  const activeConnectionIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const conn of viewConnections.activeConnections) ids.add(conn.id)
+    return ids
+  }, [viewConnections])
 
   const filterConn = useMemo(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
@@ -173,7 +215,7 @@ const ConnectionsPage = () => {
   const detailRef = useRef<ConnectionDetailRef>(null!)
 
   const selectConnectionsType = useCallback(
-    (type: 'active' | 'closed') => {
+    (type: ConnectionsType) => {
       if (type === connectionsType) return
       detailRef.current?.close()
       setIsColumnManagerOpen(false)
@@ -183,14 +225,21 @@ const ConnectionsPage = () => {
     [connectionsType],
   )
 
+  const isConnectionClosed = useCallback(
+    (id: string) =>
+      connectionsType === 'closed' ||
+      (connectionsType === 'history' && !activeConnectionIds.has(id)),
+    [connectionsType, activeConnectionIds],
+  )
+
   const showDetailById = useCallback(
     (id: string) => {
       const connection = filterConn.find((item) => item.id === id)
       if (connection) {
-        detailRef.current?.open(connection, connectionsType === 'closed')
+        detailRef.current?.open(connection, isConnectionClosed(id))
       }
     },
-    [connectionsType, filterConn],
+    [filterConn, isConnectionClosed],
   )
 
   const onCloseAll = useLockFn(closeAllConnections)
@@ -330,7 +379,38 @@ const ConnectionsPage = () => {
             {t('connections.components.actions.closed')}{' '}
             {viewConnections.closedConnections.length}
           </Button>
+          <Button
+            size="small"
+            variant={connectionsType === 'history' ? 'contained' : 'outlined'}
+            onClick={() => selectConnectionsType('history')}
+          >
+            {t('connections.components.actions.history')}{' '}
+            {viewConnections.historyConnections.length}
+          </Button>
         </ButtonGroup>
+        {connectionsType === 'history' && (
+          <BaseStyledSelect
+            value={String(historyWindowMs)}
+            onChange={(e) =>
+              setSetting((o) => ({
+                layout: o?.layout ?? 'table',
+                ...o,
+                historyWindowMs: Number(e.target.value),
+              }))
+            }
+            sx={{ mr: 1, flexBasis: 'content' }}
+          >
+            {HISTORY_WINDOW_OPTIONS.map((windowMs) => (
+              <MenuItem key={windowMs} value={windowMs}>
+                <span style={{ fontSize: 14 }}>
+                  {t('connections.components.history.window', {
+                    count: windowMs / 60_000,
+                  })}
+                </span>
+              </MenuItem>
+            ))}
+          </BaseStyledSelect>
+        )}
         {!isTableLayout && (
           <BaseStyledSelect
             value={curOrderOpt}
@@ -425,7 +505,7 @@ const ConnectionsPage = () => {
           renderItem={(i) => (
             <ConnectionRowItem
               row={displayRows[i]}
-              closed={connectionsType === 'closed'}
+              closed={isConnectionClosed(displayRows[i]?.id ?? '')}
               onShowDetail={showDetailById}
               selected={selectedIds.has(displayRows[i]?.id ?? '')}
               onToggleSelect={toggleSelect}
@@ -448,7 +528,7 @@ const ConnectionsPage = () => {
         onCreated={() => setSelectedIds(new Set())}
       />
       <Zoom
-        in={connectionsType === 'closed' && filterConn.length > 0}
+        in={connectionsType !== 'active' && filterConn.length > 0}
         unmountOnExit
       >
         <Fab
@@ -460,7 +540,11 @@ const ConnectionsPage = () => {
             bottom: isTableLayout ? 70 : 16,
           }}
           color="primary"
-          onClick={() => clearClosedConnections()}
+          onClick={() =>
+            connectionsType === 'history'
+              ? clearHistoryConnections()
+              : clearClosedConnections()
+          }
         >
           <DeleteForeverRounded sx={{ mr: 1 }} fontSize="small" />
           {t('shared.actions.clear')}
