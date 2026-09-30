@@ -5,10 +5,10 @@ import {
   createLocalBackup,
   createProfile,
   getProfiles,
-  importLocalBackup,
   listLocalBackup,
   readLocalBackupBase64,
   readProfileFile,
+  restoreLocalBackup,
   saveRulesFile,
   writeLocalBackupBase64,
 } from '@/services/cmds'
@@ -348,8 +348,10 @@ export const importQuickConfig = async (
 
     let backupFile: string
     try {
+      // 设置落盘到备份目录后按文件名恢复：`restore_local_backup` 只在备份目录里查找
       await writeLocalBackupBase64(filename, payload.settings)
-      backupFile = (await importLocalBackup(filename)) || filename
+      await restoreLocalBackup(filename)
+      backupFile = filename
     } catch {
       throw new QuickConfigError('restore')
     }
