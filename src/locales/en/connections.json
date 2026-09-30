@@ -25,6 +25,7 @@
       "active": "Active",
       "closed": "Closed",
       "history": "History",
+      "system": "System",
       "closeConnection": "Close Connection",
       "pause": "Pause refresh",
       "resume": "Resume refresh",

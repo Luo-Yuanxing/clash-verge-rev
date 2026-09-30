@@ -13,6 +13,7 @@ export interface TranslationResources {
           history: string
           pause: string
           resume: string
+          system: string
         }
         columnManager: {
           dragHandle: string

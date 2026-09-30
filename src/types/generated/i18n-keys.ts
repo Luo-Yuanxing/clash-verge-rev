@@ -20,6 +20,7 @@ export const translationKeys = [
   'connections.components.actions.active',
   'connections.components.actions.closed',
   'connections.components.actions.history',
+  'connections.components.actions.system',
   'connections.components.actions.closeConnection',
   'connections.components.actions.pause',
   'connections.components.actions.resume',

@@ -51,6 +51,8 @@ import {
   HISTORY_WINDOW_OPTIONS,
   useConnectionSetting,
 } from '@/hooks/use-connection-setting'
+import { useSystemConnections } from '@/hooks/use-system-connections'
+import { useSystemConnectionViews } from '@/hooks/use-system-connections-view'
 import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVisibility } from '@/hooks/use-visibility'
 import { isIpAddress } from '@/utils/network'
@@ -83,7 +85,7 @@ const ORDER_OPTIONS = [
 
 type OrderKey = (typeof ORDER_OPTIONS)[number]['id']
 
-type ConnectionsType = 'active' | 'closed' | 'history'
+type ConnectionsType = 'active' | 'closed' | 'history' | 'system'
 
 const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
   (acc, option) => {
@@ -94,6 +96,7 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
 )
 
 const EMPTY_CONNECTIONS: IConnectionsItem[] = []
+const EMPTY_SYSTEM_CONNECTIONS: ISystemConnectionsItem[] = []
 const ConnectionsPage = () => {
   const { t } = useTranslation()
   const pageVisible = useVisibility()
@@ -110,9 +113,18 @@ const ConnectionsPage = () => {
     clearClosedConnections,
     clearHistoryConnections,
   } = useConnectionData({ enabled: pageVisible })
+  const { data: systemConnections } = useSystemConnections({
+    enabled: pageVisible && connectionsType === 'system',
+  })
   const {
     response: { data: traffic },
   } = useTrafficData({ enabled: pageVisible })
+
+  const systemConnectionItems = systemConnections?.connections
+  const systemViews = useSystemConnectionViews(
+    systemConnectionItems ?? EMPTY_SYSTEM_CONNECTIONS,
+    connections?.activeConnections ?? EMPTY_CONNECTIONS,
+  )
 
   const [setting, setSetting] = useConnectionSetting()
 
@@ -139,10 +151,12 @@ const ConnectionsPage = () => {
     activeConnections: IConnectionsItem[]
     closedConnections: IConnectionsItem[]
     historyConnections: IConnectionsItem[]
+    systemConnections: IConnectionsItem[]
   }>({
     activeConnections: [],
     closedConnections: [],
     historyConnections: [],
+    systemConnections: [],
   })
 
   const togglePause = useCallback(() => {
@@ -152,12 +166,13 @@ const ConnectionsPage = () => {
         closedConnections: connections?.closedConnections ?? EMPTY_CONNECTIONS,
         historyConnections:
           connections?.historyConnections ?? EMPTY_CONNECTIONS,
+        systemConnections: systemViews.connections,
       }
       setPaused(true)
       return
     }
     setPaused(false)
-  }, [paused, connections])
+  }, [paused, connections, systemViews])
 
   useInterval(
     () => pruneConnectionHistory(),
@@ -175,16 +190,19 @@ const ConnectionsPage = () => {
               connections?.closedConnections ?? EMPTY_CONNECTIONS,
             historyConnections:
               connections?.historyConnections ?? EMPTY_CONNECTIONS,
+            systemConnections: systemViews.connections,
           },
-    [paused, connections],
+    [paused, connections, systemViews],
   )
 
   const selectedConnections =
-    connectionsType === 'history'
-      ? viewConnections.historyConnections
-      : connectionsType === 'closed'
-        ? viewConnections.closedConnections
-        : viewConnections.activeConnections
+    connectionsType === 'system'
+      ? viewConnections.systemConnections
+      : connectionsType === 'history'
+        ? viewConnections.historyConnections
+        : connectionsType === 'closed'
+          ? viewConnections.closedConnections
+          : viewConnections.activeConnections
 
   const activeConnectionIds = useMemo(() => {
     const ids = new Set<string>()
@@ -228,6 +246,8 @@ const ConnectionsPage = () => {
   const isConnectionClosed = useCallback(
     (id: string) =>
       connectionsType === 'closed' ||
+      // OS socket rows cannot be closed through the core API, so hide the action.
+      connectionsType === 'system' ||
       (connectionsType === 'history' && !activeConnectionIds.has(id)),
     [connectionsType, activeConnectionIds],
   )
@@ -387,6 +407,14 @@ const ConnectionsPage = () => {
             {t('connections.components.actions.history')}{' '}
             {viewConnections.historyConnections.length}
           </Button>
+          <Button
+            size="small"
+            variant={connectionsType === 'system' ? 'contained' : 'outlined'}
+            onClick={() => selectConnectionsType('system')}
+          >
+            {t('connections.components.actions.system')}{' '}
+            {viewConnections.systemConnections.length}
+          </Button>
         </ButtonGroup>
         {connectionsType === 'history' && (
           <BaseStyledSelect
@@ -528,7 +556,10 @@ const ConnectionsPage = () => {
         onCreated={() => setSelectedIds(new Set())}
       />
       <Zoom
-        in={connectionsType !== 'active' && filterConn.length > 0}
+        in={
+          (connectionsType === 'closed' || connectionsType === 'history') &&
+          filterConn.length > 0
+        }
         unmountOnExit
       >
         <Fab

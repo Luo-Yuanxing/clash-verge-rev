@@ -25,6 +25,7 @@
       "active": "活跃",
       "closed": "已关闭",
       "history": "历史",
+      "system": "系统",
       "closeConnection": "关闭连接",
       "pause": "暂停刷新",
       "resume": "恢复刷新",
