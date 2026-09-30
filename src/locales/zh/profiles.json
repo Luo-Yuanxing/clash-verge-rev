@@ -28,7 +28,7 @@
     "quickConfig": {
       "scope": {
         "all": "全部",
-        "allHint": "导出 Verge 完整备份（含订阅与规则），导入后可在设置-备份中恢复",
+        "allHint": "导出应用设置与各订阅的自定义规则（不含订阅本身），导入时规则会挂到新建的订阅上",
         "justRule": "仅规则",
         "justRuleHint": "只导出激活订阅的自定义规则"
       },
@@ -38,8 +38,8 @@
       "feedback": {
         "exported": "已生成并复制到剪贴板",
         "imported": "导入完成，新订阅：{{name}}",
-        "importedBackup": "备份已导入：{{name}}，可在设置-备份中恢复",
-        "nothingToImport": "配置里没有可导入的内容",
+        "importedBackup": "设置已导入，并为 {{count}} 个订阅挂上规则",
+        "importedSettingsOnly": "设置已导入（配置里没有自定义规则）",
         "invalid": "不是有效的快捷配置（Base64 内容不完整或已损坏）",
         "importBackupFailed": "导入备份文件失败",
         "profileFailed": "创建订阅失败",

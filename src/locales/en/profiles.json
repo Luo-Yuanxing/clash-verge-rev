@@ -28,7 +28,7 @@
     "quickConfig": {
       "scope": {
         "all": "All",
-        "allHint": "Export a full Verge backup (profiles and rules); restore it from Settings - Backup",
+        "allHint": "Export app settings and every subscription's custom rules (without the subscriptions); importing attaches them to new profiles",
         "justRule": "Rules only",
         "justRuleHint": "Export only the custom rules of the active profile"
       },
@@ -38,8 +38,8 @@
       "feedback": {
         "exported": "Generated and copied to clipboard",
         "imported": "Import finished, new profile: {{name}}",
-        "importedBackup": "Backup imported: {{name}}, restore it from Settings - Backup",
-        "nothingToImport": "Nothing to import in this config",
+        "importedBackup": "Settings imported; rules attached to {{count}} profiles",
+        "importedSettingsOnly": "Settings imported (the config carried no custom rules)",
         "invalid": "Not a valid quick config (the Base64 payload is incomplete or corrupted)",
         "importBackupFailed": "Failed to import the backup file",
         "profileFailed": "Failed to create profile",

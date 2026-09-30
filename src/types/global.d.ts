@@ -977,6 +977,12 @@ interface ILocalBackupFile {
   content_length: number
 }
 
+/** 快捷配置导出载荷里的一条自定义规则 */
+interface IRuledBackupRule {
+  name: string
+  content: string
+}
+
 interface IWebDavConfig {
   url: string
   username: string

@@ -14,16 +14,13 @@ import {
 } from '@/services/cmds'
 import { parseYamlSafe } from '@/utils/yaml'
 
-/** 导出范围：all 为 Verge 完整备份（zip 的 Base64），just-rule 只带自定义规则 */
+/** 导出范围：all 为设置 + 全部订阅规则（不含订阅本体），just-rule 只带激活订阅的规则 */
 export type QuickConfigScope = 'all' | 'just-rule'
 
 export const QUICK_CONFIG_TYPE = 'clash-verge-quick-config'
 export const QUICK_CONFIG_VERSION = 1
 /** 导入时新订阅名取 Base64 的前若干位 */
 export const QUICK_CONFIG_NAME_LENGTH = 8
-
-/** zip 魔数，用于兼容早期未压缩的 Base64 备份 */
-const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04]
 
 /** 压缩备份载荷的版本前缀，需与 src-tauri/src/feat/backup.rs 保持一致 */
 const QUICK_CONFIG_PREFIX = 'cv1:'
@@ -43,11 +40,19 @@ export interface QuickConfigPayload {
   'custom-rule'?: Record<string, unknown> | null
 }
 
+/** 导出载荷：`settings` 为剔除订阅后的设置备份，`rules` 为各订阅的自定义规则 */
+export interface RuledBackupPayload {
+  settings: string
+  rules: { name: string; content: string }[]
+}
+
 export interface QuickConfigImportResult {
   /** 新建订阅名，没有自定义规则时为 null */
   name: string | null
-  /** 导入的备份文件名，非备份配置时为 null */
+  /** 导入的备份文件名，备份载荷不可用时为 null */
   backupFile: string | null
+  /** 挂上规则的订阅数 */
+  rulesApplied: number
 }
 
 export type QuickConfigErrorCode = 'invalid' | 'profile' | 'rules' | 'restore'
@@ -76,16 +81,59 @@ const decodeBase64 = (base64: string): string => {
   return new TextDecoder().decode(bytes)
 }
 
-/** 是否为 Verge 备份载荷：`cv1:` 压缩格式或早期未压缩的 Base64 zip */
-const isBackupPayload = (text: string): boolean => {
-  if (text.startsWith(QUICK_CONFIG_PREFIX)) return true
-
-  try {
-    const head = atob(text.replace(/\s+/gu, '').slice(0, 8))
-    return ZIP_MAGIC.every((byte, index) => head.charCodeAt(index) === byte)
-  } catch {
-    return false
+/** 校验并规范化备份载荷：只接受 `cv1:` 压缩格式，非法字符判为无效 */
+const checkedBackupBody = (text: string): string => {
+  if (!text.startsWith(QUICK_CONFIG_PREFIX)) {
+    throw new QuickConfigError('invalid')
   }
+
+  const body = text.slice(QUICK_CONFIG_PREFIX.length).replace(/\s+/gu, '')
+  if (!body || !/^[A-Za-z0-9+/]+={0,2}$/u.test(body)) {
+    throw new QuickConfigError('invalid')
+  }
+  return body
+}
+
+/** 导出载荷里规则段的标记；缺失时视为只有设置 */
+const QUICK_CONFIG_RULE_MARK = '#rules='
+
+/** 校验规则清单结构 */
+const checkedRules = (value: unknown): RuledBackupPayload['rules'] => {
+  if (
+    !Array.isArray(value) ||
+    value.some(
+      (rule) =>
+        !rule ||
+        typeof rule.name !== 'string' ||
+        typeof rule.content !== 'string',
+    )
+  ) {
+    throw new QuickConfigError('invalid')
+  }
+
+  return value as RuledBackupPayload['rules']
+}
+
+/** 从「设置 + 规则」文案里解出两部分，规则段缺失时为没有规则 */
+const parseRuledBackupText = (text: string): RuledBackupPayload => {
+  const [settingsLine = '', ...rest] = text.split('\n')
+  const settings = checkedBackupBody(settingsLine.replace(/\s+/gu, ''))
+
+  const ruleLine = rest.join('').trim()
+  if (!ruleLine) return { settings, rules: [] }
+  if (!ruleLine.startsWith(QUICK_CONFIG_RULE_MARK)) {
+    throw new QuickConfigError('invalid')
+  }
+
+  let parsed: unknown
+  try {
+    const body = ruleLine.slice(QUICK_CONFIG_RULE_MARK.length)
+    parsed = JSON.parse(decodeBase64(body))
+  } catch {
+    throw new QuickConfigError('invalid')
+  }
+
+  return { settings, rules: checkedRules(parsed) }
 }
 
 /** 当前激活订阅的自定义规则；无激活订阅或无规则文件时返回 null */
@@ -107,10 +155,9 @@ const readActiveCustomRule = async (): Promise<Record<
 }
 
 /**
- * 全部范围：调用 Verge 原有备份，取回刚生成的 zip 并转成压缩后的 Base64。
- * 备份已包含全部 profiles（含规则），因此不再附加 `custom-rule` 键。
+ * 全部范围：调用 Verge 原有备份，后端再把订阅本体剔除，只回设置与各订阅的规则。
  */
-const exportBackupBase64 = async (): Promise<string> => {
+const exportBackupPayload = async (): Promise<RuledBackupPayload> => {
   const before = new Set((await listLocalBackup()).map((item) => item.filename))
 
   await createLocalBackup()
@@ -120,13 +167,21 @@ const exportBackupBase64 = async (): Promise<string> => {
   )
   if (!created) throw new QuickConfigError('invalid')
 
-  return readLocalBackupBase64(created.filename)
+  const payload = await readLocalBackupBase64(created.filename)
+  return {
+    settings: checkedBackupBody(payload.settings.replace(/\s+/gu, '')),
+    rules: checkedRules(payload.rules),
+  }
 }
 
 export const exportQuickConfig = async (
   scope: QuickConfigScope,
 ): Promise<string> => {
-  if (scope === 'all') return exportBackupBase64()
+  if (scope === 'all') {
+    const payload = await exportBackupPayload()
+    const rules = encodeBase64(JSON.stringify(payload.rules))
+    return `${payload.settings}\n${QUICK_CONFIG_RULE_MARK}${rules}`
+  }
 
   const payload: QuickConfigPayload = {
     type: QUICK_CONFIG_TYPE,
@@ -169,15 +224,6 @@ const uniqueProfileName = (items: IProfileItem[], base: string): string => {
   return name
 }
 
-/** 校验并规范化备份载荷：去掉 `cv1:` 前缀与所有空白，非法字符直接判为无效 */
-const checkedBackupBody = (text: string): string => {
-  const body = text.replace(/^cv1:/u, '').replace(/\s+/gu, '')
-  if (!body || !/^[A-Za-z0-9+/]+={0,2}$/u.test(body)) {
-    throw new QuickConfigError('invalid')
-  }
-  return body
-}
-
 /** 备份目录里的时间戳文件名，重名时追加 `-import` / `-import2` */
 const uniqueBackupFileName = (existing: Set<string>): string => {
   const stamp = dayjs().format('YYYY-MM-DD_HH-mm-ss')
@@ -191,43 +237,93 @@ const uniqueBackupFileName = (existing: Set<string>): string => {
   return name
 }
 
+/** 规则内容是否为空：`prepend`/`append`/`delete`/`rules` 全空视为没有规则 */
+const hasRuleContent = (content: string): boolean => {
+  const parsed = parseYamlSafe(content)
+  if (!parsed || typeof parsed !== 'object') return false
+
+  return Object.values(parsed as Record<string, unknown>).some((value) =>
+    Array.isArray(value) ? value.length > 0 : !!value,
+  )
+}
+
+/** 把规则挂到新建的本地订阅上，返回订阅名；订阅创建失败时返回 null */
+const createRuleProfile = async (
+  name: string,
+  content: string,
+): Promise<string | null> => {
+  const profiles = await getProfiles()
+  const uniqueName = uniqueProfileName(profiles.items ?? [], name)
+
+  try {
+    await createProfile({ type: 'local', name: uniqueName, desc: '' })
+  } catch {
+    return null
+  }
+
+  const created = (await getProfiles()).items?.find(
+    (item) => item?.name === uniqueName,
+  )
+  const rulesUid = created?.option?.rules
+  if (!rulesUid) return null
+
+  const outcome = await saveRulesFile(rulesUid, content)
+  return outcome.status === 'valid' ? uniqueName : null
+}
+
+export interface QuickConfigImportResult {
+  /** 新建订阅名，没有自定义规则时为 null */
+  name: string | null
+  /** 导入的备份文件名，备份载荷导入失败时为 null */
+  backupFile: string | null
+  /** 挂上规则的订阅数 */
+  rulesApplied: number
+}
+
 /**
- * 导入配置：Verge 备份先解码再落到本地备份目录（复用原有导入函数），
- * JSON 快捷配置则把 `custom-rule` 挂到新建的订阅（名字取 Base64 前 8 位）上。
+ * 导入配置：`cv1:` 备份载荷解出「设置 + 规则」——设置落到本地备份目录（复用原有导入函数），
+ * 规则挂到新建的订阅上；旧的 JSON 快捷配置则只带一份规则。
  */
 export const importQuickConfig = async (
   raw: string,
 ): Promise<QuickConfigImportResult> => {
-  const base64 = raw.replace(/\s+/gu, '')
-  if (!base64) throw new QuickConfigError('invalid')
+  const text = raw.trim()
+  if (!text) throw new QuickConfigError('invalid')
 
-  if (isBackupPayload(base64)) {
-    const body = checkedBackupBody(base64)
+  if (text.startsWith(QUICK_CONFIG_PREFIX)) {
+    const payload = parseRuledBackupText(text)
     const filename = uniqueBackupFileName(
       new Set((await listLocalBackup()).map((item) => item.filename)),
     )
 
+    let backupFile: string
     try {
-      await writeLocalBackupBase64(filename, body)
-    } catch {
-      throw new QuickConfigError('invalid')
-    }
-
-    try {
-      const imported = await importLocalBackup(filename)
-      return { name: null, backupFile: imported || filename }
+      await writeLocalBackupBase64(filename, payload.settings)
+      backupFile = (await importLocalBackup(filename)) || filename
     } catch {
       throw new QuickConfigError('restore')
     }
+
+    let rulesApplied = 0
+    let firstName: string | null = null
+    for (const entry of payload.rules) {
+      if (!hasRuleContent(entry.content)) continue
+      const created = await createRuleProfile(entry.name, entry.content)
+      if (!created) continue
+      rulesApplied += 1
+      firstName ??= created
+    }
+
+    return { name: firstName, backupFile, rulesApplied }
   }
 
-  const payload = parseQuickConfig(base64)
+  const payload = parseQuickConfig(text)
   const customRule = payload['custom-rule']
   if (!customRule || typeof customRule !== 'object') {
-    return { name: null, backupFile: null }
+    return { name: null, backupFile: null, rulesApplied: 0 }
   }
 
-  const nameBase = base64.slice(0, QUICK_CONFIG_NAME_LENGTH)
+  const nameBase = text.slice(0, QUICK_CONFIG_NAME_LENGTH)
   const profiles = await getProfiles()
   const name = uniqueProfileName(profiles.items ?? [], nameBase)
 
@@ -249,5 +345,5 @@ export const importQuickConfig = async (
   )
   if (outcome.status !== 'valid') throw new QuickConfigError('rules')
 
-  return { name, backupFile: null }
+  return { name, backupFile: null, rulesApplied: 1 }
 }

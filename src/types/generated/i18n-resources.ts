@@ -535,8 +535,8 @@ export interface TranslationResources {
             importBackupFailed: string
             imported: string
             importedBackup: string
+            importedSettingsOnly: string
             invalid: string
-            nothingToImport: string
             profileFailed: string
             rulesFailed: string
           }

@@ -400,7 +400,10 @@ export async function exportLocalBackup(filename: string, destination: string) {
 }
 
 export async function readLocalBackupBase64(filename: string) {
-  return invoke<string>('read_local_backup_base64', { filename })
+  return invoke<{ settings: string; rules: IRuledBackupRule[] }>(
+    'read_local_backup_base64',
+    { filename },
+  )
 }
 
 export async function writeLocalBackupBase64(
