@@ -1,3 +1,5 @@
+import * as yaml from 'js-yaml'
+
 import { readProfileFile } from '@/services/cmds'
 import { parseYamlSafe } from '@/utils/yaml'
 
@@ -18,10 +20,23 @@ export const readSeqRulesDocument = async (
   return { raw, config }
 }
 
+export interface SeqRulesConfig {
+  prepend: string[]
+  append: string[]
+  delete: string[]
+}
+
 export const toSeqConfig = (
   config?: ISeqProfileConfig | null,
-): Required<Pick<ISeqProfileConfig, 'prepend' | 'append' | 'delete'>> => ({
+): SeqRulesConfig => ({
   prepend: config?.prepend ?? [],
   append: config?.append ?? [],
   delete: config?.delete ?? [],
 })
+
+/** 序列化 Rules 配置文件，与可视化编辑器保持一致 */
+export const serializeSeqRules = (config: SeqRulesConfig): string =>
+  yaml.dump(
+    { prepend: config.prepend, append: config.append, delete: config.delete },
+    { forceQuotes: true },
+  )

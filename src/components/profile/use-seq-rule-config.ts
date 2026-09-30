@@ -1,10 +1,13 @@
-import * as yaml from 'js-yaml'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { showNotice } from '@/services/notice-service'
 import { parseYamlSafe } from '@/utils/yaml'
 
-import { readSeqRulesDocument, toSeqConfig } from './seq-rules-document'
+import {
+  readSeqRulesDocument,
+  serializeSeqRules,
+  toSeqConfig,
+} from './seq-rules-document'
 
 /**
  * 读取 Rules 配置（prepend/original/append/delete）与序列化写回，
@@ -98,10 +101,11 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
 
       try {
         setCurrData(
-          yaml.dump(
-            { prepend: prependSeq, append: appendSeq, delete: deleteSeq },
-            { forceQuotes: true },
-          ),
+          serializeSeqRules({
+            prepend: prependSeq,
+            append: appendSeq,
+            delete: deleteSeq,
+          }),
         )
       } catch (error) {
         showNotice.error(error ?? 'YAML dump error')
