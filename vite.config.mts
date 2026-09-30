@@ -7,7 +7,14 @@ import svgr from 'vite-plugin-svgr'
 
 export default defineConfig({
   root: 'src',
-  server: { port: 3000 },
+  server: {
+    port: 3000,
+    // Atomic writers (editors, agents) create `.<file>.<pid>.<uuid>.tmpdir`
+    // next to the target and rename it in place. Watching those short-lived
+    // temp files races with the rename and kills the dev server with EBUSY on
+    // Windows, so ignore them. Vite merges this with its default ignore list.
+    watch: { ignored: ['**/.*tmpdir/**'] },
+  },
   plugins: [
     svgr(),
     react(),
