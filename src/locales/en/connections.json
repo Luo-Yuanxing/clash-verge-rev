@@ -24,10 +24,14 @@
     "actions": {
       "active": "Active",
       "closed": "Closed",
+      "history": "History",
       "closeConnection": "Close Connection",
       "pause": "Pause refresh",
       "resume": "Resume refresh",
       "createRule": "Create rules"
+    },
+    "history": {
+      "window": "{{count}} min"
     },
     "columnManager": {
       "title": "Columns",

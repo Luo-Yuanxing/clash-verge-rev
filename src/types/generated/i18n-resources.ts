@@ -10,6 +10,7 @@ export interface TranslationResources {
           closeConnection: string
           closed: string
           createRule: string
+          history: string
           pause: string
           resume: string
         }
@@ -29,6 +30,9 @@ export interface TranslationResources {
           time: string
           type: string
           ulSpeed: string
+        }
+        history: {
+          window: string
         }
         order: {
           default: string

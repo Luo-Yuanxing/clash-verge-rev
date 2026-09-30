@@ -24,10 +24,14 @@
     "actions": {
       "active": "活跃",
       "closed": "已关闭",
+      "history": "历史",
       "closeConnection": "关闭连接",
       "pause": "暂停刷新",
       "resume": "恢复刷新",
       "createRule": "创建规则"
+    },
+    "history": {
+      "window": "{{count}} 分钟"
     },
     "columnManager": {
       "title": "列设置",
