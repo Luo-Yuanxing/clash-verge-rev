@@ -359,3 +359,32 @@ mod windows {
         }
     }
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    #[test]
+    fn collects_tcp_and_udp_rows_with_process_names() {
+        let snapshot = super::collect_system_connections();
+        assert!(
+            snapshot.unavailable.is_empty(),
+            "tables failed to read: {:?}",
+            snapshot.unavailable
+        );
+
+        let rows = snapshot.connections;
+        assert!(!rows.is_empty(), "no socket rows were read");
+        assert!(rows.iter().any(|row| row.protocol == "tcp"));
+        assert!(rows.iter().any(|row| row.protocol == "udp"));
+        assert!(
+            rows.iter().any(|row| row.protocol == "tcp" && row.state != "-"),
+            "no TCP row carried a state"
+        );
+
+        // The machine running the tests always holds a few sockets owned by real
+        // executables, so at least one row must resolve a process name.
+        assert!(
+            rows.iter().any(|row| row.pid > 0 && !row.process.is_empty()),
+            "no row resolved a process name"
+        );
+    }
+}
