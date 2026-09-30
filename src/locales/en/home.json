@@ -131,7 +131,7 @@
         "minutes": "{{time}} Minutes"
       },
       "unknownTime": "Unknown time",
-      "resetTotals": "Click to reset uploaded and downloaded totals",
+      "resetTotals": "Reset uploaded and downloaded totals",
       "chartStyles": {
         "smooth": "Smooth",
         "linear": "Linear"

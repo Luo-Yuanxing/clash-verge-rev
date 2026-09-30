@@ -10,7 +10,6 @@ import {
   Grid,
   PaletteColor,
   Paper,
-  Tooltip,
   Typography,
   alpha,
   useTheme,
@@ -38,13 +37,11 @@ interface StatCardProps {
   unit: string
   color: 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success'
   onClick?: () => void
-  /** 鼠标悬停提示，用于说明点击行为 */
-  hint?: string
 }
 
 // 统计卡片组件 - 使用memo优化
 const CompactStatCard = memo(
-  ({ icon, title, value, unit, color, onClick, hint }: StatCardProps) => {
+  ({ icon, title, value, unit, color, onClick }: StatCardProps) => {
     const theme = useTheme()
 
     // 获取调色板颜色 - 使用useMemo避免重复计算
@@ -60,7 +57,7 @@ const CompactStatCard = memo(
       return palette.primary.main
     }, [theme.palette, color])
 
-    const card = (
+    return (
       <Paper
         elevation={0}
         sx={{
@@ -124,14 +121,6 @@ const CompactStatCard = memo(
         </Grid>
       </Paper>
     )
-
-    if (!hint) return card
-
-    return (
-      <Tooltip title={hint} placement="top" arrow>
-        {card}
-      </Tooltip>
-    )
   },
 )
 
@@ -149,9 +138,7 @@ export const EnhancedTrafficStats = () => {
   const trafficGraph = verge?.traffic_graph ?? true
   const displayMemory = verge?.enable_memory_usage ?? true
 
-  const { data: traffic, resetTraffic } = useTrafficData({
-    enabled: pageVisible,
-  })
+  const { data: traffic } = useTrafficData({ enabled: pageVisible })
 
   const {
     response: { data: memory },
@@ -212,8 +199,6 @@ export const EnhancedTrafficStats = () => {
   }, [trafficGraph, pageVisible, theme.palette.divider])
 
   // 使用useMemo计算统计卡片配置
-  const resetHint = t('home.components.traffic.resetTotals')
-
   const statCards = useMemo(() => {
     const cards: StatCardProps[] = [
       {
@@ -243,8 +228,6 @@ export const EnhancedTrafficStats = () => {
         value: parsedData.uploadTotal,
         unit: parsedData.uploadTotalUnit,
         color: 'secondary' as const,
-        hint: resetHint,
-        onClick: resetTraffic,
       },
       {
         icon: <CloudDownloadRounded fontSize="small" />,
@@ -252,8 +235,6 @@ export const EnhancedTrafficStats = () => {
         value: parsedData.downloadTotal,
         unit: parsedData.downloadTotalUnit,
         color: 'primary' as const,
-        hint: resetHint,
-        onClick: resetTraffic,
       },
     ]
 
@@ -268,7 +249,7 @@ export const EnhancedTrafficStats = () => {
     }
 
     return cards
-  }, [t, parsedData, displayMemory, resetHint, resetTraffic])
+  }, [t, parsedData, displayMemory])
 
   return (
     <TrafficErrorBoundary

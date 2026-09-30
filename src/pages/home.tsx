@@ -2,6 +2,7 @@ import {
   DnsOutlined,
   HelpOutlineRounded,
   HistoryEduOutlined,
+  RefreshRounded,
   RouterOutlined,
   SettingsOutlined,
   SpeedOutlined,
@@ -33,6 +34,7 @@ import { EnhancedTrafficStats } from '@/components/home/enhanced-traffic-stats'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { useProfiles } from '@/hooks/use-profiles'
+import { resetTrafficTotals } from '@/hooks/use-traffic-data'
 import { useVerge } from '@/hooks/use-verge'
 import { entry_lightweight_mode } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
@@ -287,6 +289,13 @@ const HomePage = () => {
           title={t('home.page.cards.trafficStats')}
           icon={<SpeedOutlined />}
           iconColor="secondary"
+          action={
+            <Tooltip title={t('home.components.traffic.resetTotals')} arrow>
+              <IconButton size="small" onClick={resetTrafficTotals}>
+                <RefreshRounded fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          }
         >
           <EnhancedTrafficStats />
         </EnhancedCard>,
