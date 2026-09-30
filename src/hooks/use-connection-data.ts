@@ -3,6 +3,7 @@ import { MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 const MAX_CLOSED_CONNS_NUM = 500
 const MAX_HISTORY_CONNS_NUM = 2_000
+/** Minimum interval between two listener notifications (state updates are not throttled) */
 const CONNECTION_UPDATE_THROTTLE_MS = 500
 const CONNECTION_RECONNECT_DELAY_MS = 1_000
 
@@ -51,7 +52,6 @@ const initConnSummaryData: ConnectionSummaryData = {
 let connectionData: ConnectionMonitorData = initConnData
 let connectionSummary: ConnectionSummaryData = initConnSummaryData
 let flushTimer: ReturnType<typeof setTimeout> | null = null
-let pendingMessageData: string | null = null
 let lastFlushAt = 0
 
 const connectionListeners = new Set<ConnectionListener>()
@@ -307,11 +307,35 @@ const mergeConnectionSummary = (
   activeConnectionCount: payload.count ?? 0,
 })
 
-const flushPendingMessage = () => {
+const flushConnectionListeners = () => {
   flushTimer = null
-  const messageData = pendingMessageData
-  pendingMessageData = null
-  if (!messageData || connectionListeners.size === 0) return
+  lastFlushAt = Date.now()
+  if (connectionListeners.size === 0) return
+  notifyConnectionListeners()
+}
+
+/** Only the listener notification is throttled, never the state update. */
+const scheduleConnectionNotify = () => {
+  if (flushTimer) return
+
+  const elapsed = Date.now() - lastFlushAt
+  if (elapsed >= CONNECTION_UPDATE_THROTTLE_MS) {
+    flushConnectionListeners()
+    return
+  }
+
+  flushTimer = window.setTimeout(
+    flushConnectionListeners,
+    CONNECTION_UPDATE_THROTTLE_MS - elapsed,
+  )
+}
+
+/**
+ * Record every websocket frame, so connections that appear and disappear
+ * between two notifications still land in the closed and history lists.
+ */
+const recordConnectionMessage = (messageData: string) => {
+  if (connectionListeners.size === 0) return
 
   let payload: IConnections
   try {
@@ -322,7 +346,6 @@ const flushPendingMessage = () => {
   }
 
   const now = Date.now()
-  lastFlushAt = now
   const nextData = mergeConnectionSnapshot(payload, connectionData)
   connectionData = {
     ...nextData,
@@ -332,31 +355,13 @@ const flushPendingMessage = () => {
       now,
     ),
   }
-  notifyConnectionListeners()
+  scheduleConnectionNotify()
 }
 
-const enqueueConnectionMessage = (messageData: string) => {
-  pendingMessageData = messageData
-  if (flushTimer) return
-
-  const elapsed = Date.now() - lastFlushAt
-  if (elapsed >= CONNECTION_UPDATE_THROTTLE_MS) {
-    flushPendingMessage()
-    return
-  }
-
-  flushTimer = window.setTimeout(
-    flushPendingMessage,
-    CONNECTION_UPDATE_THROTTLE_MS - elapsed,
-  )
-}
-
-const clearPendingMessage = () => {
-  pendingMessageData = null
-  if (flushTimer) {
-    window.clearTimeout(flushTimer)
-    flushTimer = null
-  }
+const clearPendingNotify = () => {
+  if (!flushTimer) return
+  window.clearTimeout(flushTimer)
+  flushTimer = null
 }
 
 interface SocketSupervisor {
@@ -474,9 +479,9 @@ const handleSummaryText = (messageData: string) => {
 const connectionSupervisor = createSocketSupervisor({
   listeners: connectionListeners,
   connectSocket: () => MihomoWebSocket.connect_connections(),
-  onText: enqueueConnectionMessage,
+  onText: recordConnectionMessage,
   closeLogLabel: 'connection',
-  onIdle: clearPendingMessage,
+  onIdle: clearPendingNotify,
 })
 
 const summarySupervisor = createSocketSupervisor({
