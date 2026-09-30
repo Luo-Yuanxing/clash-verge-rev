@@ -14,9 +14,7 @@
       "source": "Source",
       "destination": "Destination",
       "destinationPort": "Destination Port",
-      "type": "Type",
-      "state": "State",
-      "pid": "Process ID"
+      "type": "Type"
     },
     "order": {
       "default": "Default",
@@ -27,7 +25,6 @@
       "active": "Active",
       "closed": "Closed",
       "history": "History",
-      "system": "System",
       "closeConnection": "Close Connection",
       "pause": "Pause refresh",
       "resume": "Resume refresh",
@@ -35,9 +32,6 @@
     },
     "history": {
       "window": "{{count}} min"
-    },
-    "system": {
-      "noRemote": "None (listening)"
     },
     "columnManager": {
       "title": "Columns",
