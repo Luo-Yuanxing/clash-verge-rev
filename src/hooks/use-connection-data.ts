@@ -2,8 +2,18 @@ import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 const MAX_CLOSED_CONNS_NUM = 500
+const MAX_HISTORY_CONNS_NUM = 2_000
 const CONNECTION_UPDATE_THROTTLE_MS = 500
 const CONNECTION_RECONNECT_DELAY_MS = 1_000
+
+export const DEFAULT_HISTORY_WINDOW_MS = 10 * 60 * 1_000
+const MIN_HISTORY_WINDOW_MS = 60 * 1_000
+
+export interface ConnectionHistoryItem extends IConnectionsItem {
+  /** Timestamp of the last snapshot the connection was seen in */
+  lastSeen: number
+  active: boolean
+}
 
 type ConnectionMetadata = IConnectionsItem['metadata']
 type ConnectionListener = () => void
@@ -15,6 +25,7 @@ const initConnData: ConnectionMonitorData = {
   downloadTotal: 0,
   activeConnections: [],
   closedConnections: [],
+  historyConnections: [],
 }
 
 interface ConnectionMonitorData {
@@ -22,6 +33,7 @@ interface ConnectionMonitorData {
   downloadTotal: number
   activeConnections: IConnectionsItem[]
   closedConnections: IConnectionsItem[]
+  historyConnections: ConnectionHistoryItem[]
 }
 
 interface ConnectionSummaryPayload {
@@ -171,6 +183,7 @@ const mergeConnectionSnapshot = (
       downloadTotal: payload.downloadTotal ?? 0,
       activeConnections,
       closedConnections: previousClosed,
+      historyConnections: previous.historyConnections,
     }
   }
 
@@ -202,7 +215,90 @@ const mergeConnectionSnapshot = (
     downloadTotal: payload.downloadTotal ?? 0,
     activeConnections,
     closedConnections,
+    historyConnections: previous.historyConnections,
   }
+}
+
+let historyWindowMs = DEFAULT_HISTORY_WINDOW_MS
+
+/**
+ * Append the latest snapshot to the rolling history window.
+ * Active connections are refreshed in place, disappeared ones keep their
+ * last seen timestamp and are dropped once they leave the window.
+ */
+const mergeConnectionHistory = (
+  previous: ConnectionHistoryItem[],
+  activeConnections: IConnectionsItem[],
+  now: number,
+): ConnectionHistoryItem[] => {
+  const cutoff = now - historyWindowMs
+  const activeById = new Map<string, IConnectionsItem>()
+  for (let i = 0; i < activeConnections.length; i++) {
+    activeById.set(activeConnections[i].id, activeConnections[i])
+  }
+
+  const nextHistory: ConnectionHistoryItem[] = []
+  const recorded = new Set<string>()
+
+  for (let i = 0; i < previous.length; i++) {
+    const item = previous[i]
+    if (recorded.has(item.id)) continue
+
+    const active = activeById.get(item.id)
+    if (active) {
+      recorded.add(item.id)
+      nextHistory.push({ ...active, lastSeen: now, active: true })
+      continue
+    }
+
+    if (item.lastSeen < cutoff) continue
+    recorded.add(item.id)
+    nextHistory.push(
+      item.active ? { ...item, active: false, lastSeen: now } : item,
+    )
+  }
+
+  for (let i = 0; i < activeConnections.length; i++) {
+    const connection = activeConnections[i]
+    if (recorded.has(connection.id)) continue
+    recorded.add(connection.id)
+    nextHistory.push({ ...connection, lastSeen: now, active: true })
+  }
+
+  if (nextHistory.length <= MAX_HISTORY_CONNS_NUM) return nextHistory
+
+  nextHistory.sort((a, b) => b.lastSeen - a.lastSeen)
+  nextHistory.length = MAX_HISTORY_CONNS_NUM
+  return nextHistory
+}
+
+export const pruneConnectionHistory = () => {
+  const cutoff = Date.now() - historyWindowMs
+  const activeIds = new Set<string>()
+  for (let i = 0; i < connectionData.activeConnections.length; i++) {
+    activeIds.add(connectionData.activeConnections[i].id)
+  }
+
+  const nextHistory = connectionData.historyConnections.filter(
+    (item) => activeIds.has(item.id) || item.lastSeen >= cutoff,
+  )
+  if (nextHistory.length === connectionData.historyConnections.length) return
+
+  connectionData = { ...connectionData, historyConnections: nextHistory }
+  notifyConnectionListeners()
+}
+
+export const setConnectionHistoryWindow = (windowMs: number) => {
+  const nextWindowMs = Math.max(MIN_HISTORY_WINDOW_MS, windowMs)
+  if (nextWindowMs === historyWindowMs) return
+  historyWindowMs = nextWindowMs
+  pruneConnectionHistory()
+}
+
+export const clearConnectionHistoryData = () => {
+  if (connectionData.historyConnections.length === 0) return
+  connectionData = { ...connectionData, historyConnections: [] }
+  notifyConnectionListeners()
 }
 
 const mergeConnectionSummary = (
@@ -225,9 +321,17 @@ const flushPendingMessage = () => {
     return
   }
 
-  lastFlushAt = Date.now()
-
-  connectionData = mergeConnectionSnapshot(payload, connectionData)
+  const now = Date.now()
+  lastFlushAt = now
+  const nextData = mergeConnectionSnapshot(payload, connectionData)
+  connectionData = {
+    ...nextData,
+    historyConnections: mergeConnectionHistory(
+      connectionData.historyConnections,
+      nextData.activeConnections,
+      now,
+    ),
+  }
   notifyConnectionListeners()
 }
 
@@ -428,10 +532,14 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
   const clearClosedConnections = useCallback(() => {
     clearClosedConnectionData()
   }, [])
+  const clearHistoryConnections = useCallback(() => {
+    clearConnectionHistoryData()
+  }, [])
 
   return {
     response,
     clearClosedConnections,
+    clearHistoryConnections,
   }
 }
 

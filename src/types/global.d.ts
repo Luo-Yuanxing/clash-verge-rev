@@ -205,6 +205,8 @@ interface IConnections {
 
 interface IConnectionSetting {
   layout: 'table' | 'list'
+  /** Rolling window of the connection history, in milliseconds */
+  historyWindowMs?: number
 }
 
 interface IClashInfo {
