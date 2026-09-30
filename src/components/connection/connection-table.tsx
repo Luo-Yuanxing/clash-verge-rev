@@ -36,6 +36,12 @@ const SELECT_COLUMN_WIDTH = 40
 const RESIZE_HANDLE_WIDTH = 6
 const OVERSCAN_ROWS = 6
 const MAX_ROW_SNAPSHOT_CACHE_SIZE = 2_000
+/** 单元格左右各 8px 内边距 */
+const CELL_PADDING_WIDTH = 16
+/** 链路表头除列名外还要放下当前值与下拉箭头 */
+const CHAIN_HEADER_EXTRA_WIDTH = 80
+const CELL_FONT_SIZE = 13
+const MAX_TEXT_WIDTH_CACHE_SIZE = 2_000
 
 const reconcileColumnOrder = (
   storedOrder: string[],
@@ -70,6 +76,8 @@ interface BaseColumn {
   minWidth: number
   maxWidth?: number
   align?: 'left' | 'right'
+  /** 未手动调整过宽度时，按列内容的实际宽度决定 */
+  autoWidth?: boolean
   cell?: (row: IConnectionsItem, snapshot: TableRowSnapshot) => string
 }
 
@@ -101,15 +109,20 @@ interface TableRowSnapshot {
 const resolveColumnSize = (
   column: BaseColumn,
   storedSize: number | undefined,
+  autoSize: number | undefined,
 ) => {
-  if (typeof storedSize !== 'number' || !Number.isFinite(storedSize)) {
-    return column.width
+  const bounded = (size: number) =>
+    column.maxWidth === undefined ? size : Math.min(column.maxWidth, size)
+
+  if (typeof storedSize === 'number' && Number.isFinite(storedSize)) {
+    return bounded(Math.max(column.minWidth, storedSize))
   }
 
-  const boundedMin = Math.max(column.minWidth, storedSize)
-  return column.maxWidth === undefined
-    ? boundedMin
-    : Math.min(column.maxWidth, boundedMin)
+  if (typeof autoSize === 'number' && Number.isFinite(autoSize)) {
+    return bounded(Math.max(column.minWidth, autoSize))
+  }
+
+  return column.width
 }
 
 const sameStaticConnection = (
@@ -539,19 +552,22 @@ export const ConnectionTable = (props: Props) => {
         field: 'chains',
         headerName: t('connections.components.fields.chains'),
         width: 280,
-        minWidth: 160,
+        minWidth: 100,
+        autoWidth: true,
       },
       {
         field: 'rule',
         headerName: t('connections.components.fields.rule'),
         width: 220,
-        minWidth: 160,
+        minWidth: 80,
+        autoWidth: true,
       },
       {
         field: 'process',
         headerName: t('connections.components.fields.process'),
         width: 180,
-        minWidth: 140,
+        minWidth: 80,
+        autoWidth: true,
       },
       {
         field: 'time',
@@ -596,6 +612,18 @@ export const ConnectionTable = (props: Props) => {
     })
   }, [baseColumns, setColumnOrder])
 
+  const rowSnapshotCacheRef = useRef(new Map<string, TableRowSnapshot>())
+  const getRowSnapshot = useCallback((row: IConnectionsItem) => {
+    const cache = rowSnapshotCacheRef.current
+    const snapshot = createTableRowSnapshot(row, cache.get(row.id))
+    cache.set(row.id, snapshot)
+    if (cache.size > MAX_ROW_SNAPSHOT_CACHE_SIZE) {
+      const oldestKey = cache.keys().next().value
+      if (oldestKey && oldestKey !== row.id) cache.delete(oldestKey)
+    }
+    return snapshot
+  }, [])
+
   const orderedColumns = useMemo(() => {
     const baseFields = baseColumns.map((column) => column.field)
     const reconciledOrder = reconcileColumnOrder(columnOrder, baseFields)
@@ -609,6 +637,52 @@ export const ConnectionTable = (props: Props) => {
       .filter((column): column is BaseColumn => Boolean(column))
   }, [baseColumns, columnOrder])
 
+  /** 测量文本实际宽度，结果按文本缓存 */
+  const measureText = useMemo(() => {
+    const context = document.createElement('canvas').getContext('2d')
+    if (!context) return null
+
+    context.font = `${CELL_FONT_SIZE}px ${theme.typography.fontFamily}`
+    const cache = new Map<string, number>()
+
+    return (text: string) => {
+      const cached = cache.get(text)
+      if (cached !== undefined) return cached
+
+      const width = context.measureText(text).width
+      if (cache.size < MAX_TEXT_WIDTH_CACHE_SIZE) cache.set(text, width)
+      return width
+    }
+  }, [theme.typography.fontFamily])
+
+  /** 自适应列的宽度：列名与当前列表内容里最宽的一项 */
+  const autoColumnWidths = useMemo(() => {
+    const widths = new Map<ColumnField, number>()
+    if (!measureText) return widths
+
+    for (const column of baseColumns) {
+      if (!column.autoWidth) continue
+
+      const headerExtra =
+        column.field === 'chains' ? CHAIN_HEADER_EXTRA_WIDTH : 0
+      let width =
+        measureText(column.headerName) + headerExtra + CELL_PADDING_WIDTH
+
+      for (const connection of connections) {
+        const text = String(
+          getConnectionCellValue(column.field, getRowSnapshot(connection)) ??
+            '',
+        )
+        const cellWidth = measureText(text) + CELL_PADDING_WIDTH
+        if (cellWidth > width) width = cellWidth
+      }
+
+      widths.set(column.field, width)
+    }
+
+    return widths
+  }, [baseColumns, connections, getRowSnapshot, measureText])
+
   const visibleColumns = useMemo<DisplayColumn[]>(() => {
     return orderedColumns
       .filter(
@@ -616,24 +690,17 @@ export const ConnectionTable = (props: Props) => {
       )
       .map((column) => ({
         ...column,
-        size: resolveColumnSize(column, columnWidths?.[column.field]),
+        size: resolveColumnSize(
+          column,
+          columnWidths?.[column.field],
+          autoColumnWidths.get(column.field),
+        ),
       }))
-  }, [columnVisibilityModel, columnWidths, orderedColumns])
+  }, [columnVisibilityModel, columnWidths, orderedColumns, autoColumnWidths])
 
   const [sorting, setSorting] = useState<SortingState | null>(null)
   const [viewport, setViewport] = useState({ scrollTop: 0, height: 0 })
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const rowSnapshotCacheRef = useRef(new Map<string, TableRowSnapshot>())
-  const getRowSnapshot = useCallback((row: IConnectionsItem) => {
-    const cache = rowSnapshotCacheRef.current
-    const snapshot = createTableRowSnapshot(row, cache.get(row.id))
-    cache.set(row.id, snapshot)
-    if (cache.size > MAX_ROW_SNAPSHOT_CACHE_SIZE) {
-      const oldestKey = cache.keys().next().value
-      if (oldestKey && oldestKey !== row.id) cache.delete(oldestKey)
-    }
-    return snapshot
-  }, [])
   const updateViewport = useCallback((element: HTMLDivElement) => {
     setViewport((current) => {
       const next = {
