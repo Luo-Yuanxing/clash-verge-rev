@@ -44,6 +44,20 @@ const MAX_PREVIEW_RULES = 20
 const PROFILE_STORAGE_KEY = 'connection-rule-profile-uid'
 /** 记住上次使用的代理组，作为下次的默认值 */
 const PROXY_GROUP_STORAGE_KEY = 'connection-rule-proxy-group'
+/** 记住上次使用的代理策略，作为下次的默认值；首次默认 PROXY */
+const POLICY_STORAGE_KEY = 'connection-rule-policy'
+
+/** 表单控件统一固定宽度 */
+const FIELD_SX = { width: 240 } as const
+/** 下拉框固定宽度并截断过长文案 */
+const SELECT_FIELD_SX = {
+  ...FIELD_SX,
+  '& .MuiSelect-select': {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+} as const
 
 interface Props {
   open: boolean
@@ -70,13 +84,21 @@ export const ConnectionRuleDialog = (props: Props) => {
   )
 
   const [ruleType, setRuleType] = useState<RuleType>(RULE_TYPES[0])
-  const [policyOption, setPolicyOption] = useState<PolicyOption>('DIRECT')
+  const [pickedPolicy, setPickedPolicy] = useLocalStorage<PolicyOption>(
+    POLICY_STORAGE_KEY,
+    'PROXY',
+  )
   const [proxyGroups, setProxyGroups] = useState<string[]>([])
   const [pickedUid, setPickedUid] = useLocalStorage(PROFILE_STORAGE_KEY, '')
   const [pickedGroup, setPickedGroup] = useLocalStorage(
     PROXY_GROUP_STORAGE_KEY,
     '',
   )
+
+  /** 首次默认 PROXY，之后沿用用户上次的选择 */
+  const policyOption: PolicyOption = POLICY_OPTIONS.includes(pickedPolicy)
+    ? pickedPolicy
+    : 'PROXY'
 
   const selectedUid = useMemo(() => {
     if (pickedUid && items.some((item) => item.uid === pickedUid)) {
@@ -215,7 +237,7 @@ export const ConnectionRuleDialog = (props: Props) => {
             <TextField
               select
               size="small"
-              sx={{ minWidth: 240 }}
+              sx={SELECT_FIELD_SX}
               value={selectedUid}
               disabled={items.length === 0}
               onChange={(event) => setPickedUid(event.target.value)}
@@ -233,7 +255,7 @@ export const ConnectionRuleDialog = (props: Props) => {
             <TextField
               select
               size="small"
-              sx={{ minWidth: 240 }}
+              sx={SELECT_FIELD_SX}
               value={ruleType}
               onChange={(event) => setRuleType(event.target.value as RuleType)}
             >
@@ -252,10 +274,10 @@ export const ConnectionRuleDialog = (props: Props) => {
             <TextField
               select
               size="small"
-              sx={{ minWidth: 240 }}
+              sx={SELECT_FIELD_SX}
               value={policyOption}
               onChange={(event) =>
-                setPolicyOption(event.target.value as PolicyOption)
+                setPickedPolicy(event.target.value as PolicyOption)
               }
             >
               {POLICY_OPTIONS.map((policy) => (
@@ -277,7 +299,7 @@ export const ConnectionRuleDialog = (props: Props) => {
               />
               <Autocomplete
                 size="small"
-                sx={{ minWidth: 240 }}
+                sx={FIELD_SX}
                 options={proxyGroups}
                 value={selectedGroup || null}
                 onChange={(_, value) => setPickedGroup(value ?? '')}
