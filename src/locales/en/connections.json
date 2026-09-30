@@ -24,11 +24,44 @@
     "actions": {
       "active": "Active",
       "closed": "Closed",
-      "closeConnection": "Close Connection"
+      "closeConnection": "Close Connection",
+      "pause": "Pause refresh",
+      "resume": "Resume refresh",
+      "createRule": "Create rules"
     },
     "columnManager": {
       "title": "Columns",
       "dragHandle": "Drag handle"
+    },
+    "ruleDialog": {
+      "title": "Create rules from connections",
+      "labels": {
+        "proxyGroup": "Proxy group",
+        "position": "Insert position"
+      },
+      "policies": {
+        "PROXY": "Proxy (pick a group)"
+      },
+      "positions": {
+        "prepend": "Insert at top",
+        "append": "Insert at bottom"
+      },
+      "summary": "{{count}} rule(s) will be created from the selected hostnames",
+      "skipped": "Skipped {{count}} IP connection(s)",
+      "empty": "No hostname available for rules",
+      "more": "…and {{count}} more",
+      "actions": {
+        "create": "Create"
+      },
+      "errors": {
+        "noRulesProfile": "The current profile has no custom rules file enabled",
+        "proxyGroupRequired": "Please pick the proxy group for Proxy",
+        "saveFailed": "Failed to save rules"
+      },
+      "notifications": {
+        "created": "Created {{count}} rule(s)",
+        "duplicated": "All selected rules already exist"
+      }
     }
   }
 }

@@ -1,5 +1,5 @@
 import { CloseRounded } from '@mui/icons-material'
-import { IconButton } from '@mui/material'
+import { Checkbox, IconButton } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import { memo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -12,6 +12,8 @@ interface Props {
   row: ConnectionRowView
   closed: boolean
   onShowDetail: (id: string) => void
+  selected: boolean
+  onToggleSelect: (id: string) => void
 }
 
 const tagStyle = {
@@ -33,7 +35,7 @@ const itemStyle = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  padding: '6px 48px 6px 12px',
+  padding: '6px 48px 6px 4px',
   borderBottom: '1px solid var(--divider-color)',
   position: 'relative',
   overflow: 'hidden',
@@ -70,17 +72,33 @@ const actionStyle = {
 } as const
 
 export const ConnectionRowItem = memo(
-  function ConnectionRowItem({ row, closed, onShowDetail }: Props) {
+  function ConnectionRowItem({
+    row,
+    closed,
+    onShowDetail,
+    selected,
+    onToggleSelect,
+  }: Props) {
     const { t } = useTranslation()
     const onDelete = useLockFn(async () => closeConnection(row.id))
     const handleShowDetail = useCallback(
       () => onShowDetail(row.id),
       [onShowDetail, row.id],
     )
+    const handleToggleSelect = useCallback(
+      () => onToggleSelect(row.id),
+      [onToggleSelect, row.id],
+    )
     const showTraffic = row.uploadSpeed >= 100 || row.downloadSpeed >= 100
 
     return (
       <div style={itemStyle}>
+        <Checkbox
+          size="small"
+          checked={selected}
+          onChange={handleToggleSelect}
+          sx={{ flexShrink: 0, p: 0.5 }}
+        />
         <div style={contentStyle} onClick={handleShowDetail}>
           <div style={primaryStyle}>{row.host}</div>
           <div style={tagsStyle}>
@@ -116,5 +134,7 @@ export const ConnectionRowItem = memo(
   (prev, next) =>
     prev.row === next.row &&
     prev.closed === next.closed &&
-    prev.onShowDetail === next.onShowDetail,
+    prev.onShowDetail === next.onShowDetail &&
+    prev.selected === next.selected &&
+    prev.onToggleSelect === next.onToggleSelect,
 )

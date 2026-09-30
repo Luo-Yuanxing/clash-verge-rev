@@ -1,3 +1,4 @@
+import { Checkbox } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { useLocalStorage } from 'foxact/use-local-storage'
 import {
@@ -31,6 +32,7 @@ import {
 } from './connection-row-view'
 
 const ROW_HEIGHT = 40
+const SELECT_COLUMN_WIDTH = 40
 const RESIZE_HANDLE_WIDTH = 6
 const OVERSCAN_ROWS = 6
 const MAX_ROW_SNAPSHOT_CACHE_SIZE = 2_000
@@ -244,6 +246,14 @@ const renderCell = (
   return getConnectionCellValue(column.field, snapshot)
 }
 
+const selectCellStyle = {
+  boxSizing: 'border-box',
+  flex: `0 0 ${SELECT_COLUMN_WIDTH}px`,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+} as const
+
 interface RowComponentProps {
   row: IConnectionsItem
   columns: DisplayColumn[]
@@ -251,6 +261,8 @@ interface RowComponentProps {
   getSnapshot: (row: IConnectionsItem) => TableRowSnapshot
   borderColor: string
   virtualTop: number
+  selected: boolean
+  onToggleSelect: (id: string) => void
 }
 
 const RowComponent = memo(
@@ -261,10 +273,20 @@ const RowComponent = memo(
     getSnapshot,
     borderColor,
     virtualTop,
+    selected,
+    onToggleSelect,
   }: RowComponentProps) {
     const handleClick = useCallback(
       () => onShowDetail(row.id),
       [onShowDetail, row.id],
+    )
+    const handleToggleSelect = useCallback(
+      () => onToggleSelect(row.id),
+      [onToggleSelect, row.id],
+    )
+    const stopPropagation = useCallback(
+      (event: ReactMouseEvent<HTMLDivElement>) => event.stopPropagation(),
+      [],
     )
     const snapshot = getSnapshot(row)
 
@@ -282,6 +304,13 @@ const RowComponent = memo(
         }}
         onClick={handleClick}
       >
+        <div style={selectCellStyle} onClick={stopPropagation}>
+          <Checkbox
+            size="small"
+            checked={selected}
+            onChange={handleToggleSelect}
+          />
+        </div>
         {columns.map((column) => (
           <div
             key={column.field}
@@ -313,7 +342,9 @@ const RowComponent = memo(
     prev.virtualTop === next.virtualTop &&
     prev.onShowDetail === next.onShowDetail &&
     prev.getSnapshot === next.getSnapshot &&
-    prev.borderColor === next.borderColor,
+    prev.borderColor === next.borderColor &&
+    prev.selected === next.selected &&
+    prev.onToggleSelect === next.onToggleSelect,
 )
 
 interface Props {
@@ -321,6 +352,9 @@ interface Props {
   onShowDetail: (id: string) => void
   columnManagerOpen: boolean
   onCloseColumnManager: () => void
+  selectedIds: ReadonlySet<string>
+  onToggleSelect: (id: string) => void
+  onToggleSelectAll: (ids: string[]) => void
 }
 
 export const ConnectionTable = (props: Props) => {
@@ -329,6 +363,9 @@ export const ConnectionTable = (props: Props) => {
     onShowDetail: rawOnShowDetail,
     columnManagerOpen,
     onCloseColumnManager,
+    selectedIds,
+    onToggleSelect,
+    onToggleSelectAll,
   } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
@@ -591,9 +628,27 @@ export const ConnectionTable = (props: Props) => {
   }, [connections, sorting, getRowSnapshot])
 
   const tableWidth = useMemo(
-    () => visibleColumns.reduce((total, column) => total + column.size, 0),
+    () =>
+      visibleColumns.reduce((total, column) => total + column.size, 0) +
+      SELECT_COLUMN_WIDTH,
     [visibleColumns],
   )
+
+  const selectedCount = useMemo(() => {
+    let count = 0
+    for (const connection of connections) {
+      if (selectedIds.has(connection.id)) count += 1
+    }
+    return count
+  }, [connections, selectedIds])
+
+  const allSelected =
+    connections.length > 0 && selectedCount === connections.length
+  const partiallySelected = selectedCount > 0 && !allSelected
+
+  const handleToggleSelectAll = useCallback(() => {
+    onToggleSelectAll(connections.map((connection) => connection.id))
+  }, [connections, onToggleSelectAll])
   const handleScroll = useCallback(
     (event: ReactUIEvent<HTMLDivElement>) => {
       updateViewport(event.currentTarget)
@@ -791,6 +846,14 @@ export const ConnectionTable = (props: Props) => {
                   backgroundColor: headerBackground,
                 }}
               >
+                <div style={selectCellStyle}>
+                  <Checkbox
+                    size="small"
+                    checked={allSelected}
+                    indeterminate={partiallySelected}
+                    onChange={handleToggleSelectAll}
+                  />
+                </div>
                 {visibleColumns.map((column) => (
                   <div
                     key={column.field}
@@ -877,6 +940,8 @@ export const ConnectionTable = (props: Props) => {
                       getSnapshot={getRowSnapshot}
                       borderColor={borderColor}
                       virtualTop={index * ROW_HEIGHT}
+                      selected={selectedIds.has(row.id)}
+                      onToggleSelect={onToggleSelect}
                     />
                   )
                 },

@@ -9,6 +9,9 @@ export interface TranslationResources {
           active: string
           closeConnection: string
           closed: string
+          createRule: string
+          pause: string
+          resume: string
         }
         columnManager: {
           dragHandle: string
@@ -31,6 +34,36 @@ export interface TranslationResources {
           default: string
           downloadSpeed: string
           uploadSpeed: string
+        }
+        ruleDialog: {
+          actions: {
+            create: string
+          }
+          empty: string
+          errors: {
+            noRulesProfile: string
+            proxyGroupRequired: string
+            saveFailed: string
+          }
+          labels: {
+            position: string
+            proxyGroup: string
+          }
+          more: string
+          notifications: {
+            created: string
+            duplicated: string
+          }
+          policies: {
+            PROXY: string
+          }
+          positions: {
+            append: string
+            prepend: string
+          }
+          skipped: string
+          summary: string
+          title: string
         }
       }
       page: {

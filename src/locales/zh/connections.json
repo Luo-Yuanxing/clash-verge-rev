@@ -24,11 +24,44 @@
     "actions": {
       "active": "活跃",
       "closed": "已关闭",
-      "closeConnection": "关闭连接"
+      "closeConnection": "关闭连接",
+      "pause": "暂停刷新",
+      "resume": "恢复刷新",
+      "createRule": "创建规则"
     },
     "columnManager": {
       "title": "列设置",
       "dragHandle": "拖拽控件"
+    },
+    "ruleDialog": {
+      "title": "一键创建规则",
+      "labels": {
+        "proxyGroup": "代理组",
+        "position": "插入位置"
+      },
+      "policies": {
+        "PROXY": "Proxy（自选代理组）"
+      },
+      "positions": {
+        "prepend": "插入到最前",
+        "append": "插入到最后"
+      },
+      "summary": "将创建 {{count}} 条规则，规则内容为连接的主机名",
+      "skipped": "已跳过 {{count}} 个 IP 类型的连接",
+      "empty": "没有可创建规则的主机名",
+      "more": "…以及另外 {{count}} 条",
+      "actions": {
+        "create": "创建"
+      },
+      "errors": {
+        "noRulesProfile": "当前订阅未启用自定义规则文件，无法创建规则",
+        "proxyGroupRequired": "请先选择 Proxy 对应的代理组",
+        "saveFailed": "规则保存失败"
+      },
+      "notifications": {
+        "created": "已创建 {{count}} 条规则",
+        "duplicated": "选中的连接对应的规则均已存在"
+      }
     }
   }
 }

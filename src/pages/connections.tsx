@@ -1,5 +1,8 @@
 import {
   DeleteForeverRounded,
+  PauseRounded,
+  PlayArrowRounded,
+  RuleRounded,
   TableChartRounded,
   TableRowsRounded,
   ViewColumnRounded,
@@ -36,11 +39,14 @@ import {
   getConnectionStartTime,
   useConnectionRowViews,
 } from '@/components/connection/connection-row-view'
+import { ConnectionRuleDialog } from '@/components/connection/connection-rule-dialog'
 import { ConnectionTable } from '@/components/connection/connection-table'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useConnectionSetting } from '@/hooks/use-connection-setting'
+import { useProfiles } from '@/hooks/use-profiles'
 import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVisibility } from '@/hooks/use-visibility'
+import { isIpAddress } from '@/utils/network'
 import parseTraffic from '@/utils/parse-traffic'
 
 type OrderFunc = (list: IConnectionsItem[]) => IConnectionsItem[]
@@ -104,11 +110,49 @@ const ConnectionsPage = () => {
   const isTableLayout = setting.layout === 'table'
 
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
+  const [isRuleDialogOpen, setIsRuleDialogOpen] = useState(false)
+  const [paused, setPaused] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+
+  const { current } = useProfiles()
+  const rulesProperty = current?.option?.rules
+
+  const frozenRef = useRef<{
+    activeConnections: IConnectionsItem[]
+    closedConnections: IConnectionsItem[]
+  }>({ activeConnections: [], closedConnections: [] })
+
+  const togglePause = useCallback(() => {
+    if (!paused) {
+      frozenRef.current = {
+        activeConnections: connections?.activeConnections ?? EMPTY_CONNECTIONS,
+        closedConnections: connections?.closedConnections ?? EMPTY_CONNECTIONS,
+      }
+      setPaused(true)
+      return
+    }
+    setPaused(false)
+  }, [paused, connections])
+
+  const viewConnections = useMemo(
+    () =>
+      paused
+        ? frozenRef.current
+        : {
+            activeConnections:
+              connections?.activeConnections ?? EMPTY_CONNECTIONS,
+            closedConnections:
+              connections?.closedConnections ?? EMPTY_CONNECTIONS,
+          },
+    [paused, connections],
+  )
 
   const selectedConnections =
     connectionsType === 'active'
-      ? (connections?.activeConnections ?? EMPTY_CONNECTIONS)
-      : (connections?.closedConnections ?? EMPTY_CONNECTIONS)
+      ? viewConnections.activeConnections
+      : viewConnections.closedConnections
 
   const filterConn = useMemo(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
@@ -137,6 +181,7 @@ const ConnectionsPage = () => {
       if (type === connectionsType) return
       detailRef.current?.close()
       setIsColumnManagerOpen(false)
+      setSelectedIds(new Set())
       setConnectionsType(type)
     },
     [connectionsType],
@@ -153,6 +198,50 @@ const ConnectionsPage = () => {
   )
 
   const onCloseAll = useLockFn(closeAllConnections)
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  const toggleSelectAll = useCallback((ids: string[]) => {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      const allSelected = ids.length > 0 && ids.every((id) => next.has(id))
+      for (const id of ids) {
+        if (allSelected) {
+          next.delete(id)
+        } else {
+          next.add(id)
+        }
+      }
+      return next
+    })
+  }, [])
+
+  const { ruleHosts, skippedHosts } = useMemo(() => {
+    const hosts = new Set<string>()
+    let skipped = 0
+
+    for (const connection of selectedConnections) {
+      if (!selectedIds.has(connection.id)) continue
+      const host = (connection.metadata?.host ?? '').trim()
+      if (!host || isIpAddress(host)) {
+        skipped += 1
+        continue
+      }
+      hosts.add(host)
+    }
+
+    return { ruleHosts: [...hosts], skippedHosts: skipped }
+  }, [selectedConnections, selectedIds])
 
   const handleSearch = useCallback(
     (match: (content: string) => boolean, state: SearchState) => {
@@ -235,7 +324,7 @@ const ConnectionsPage = () => {
             onClick={() => selectConnectionsType('active')}
           >
             {t('connections.components.actions.active')}{' '}
-            {connections?.activeConnections.length}
+            {viewConnections.activeConnections.length}
           </Button>
           <Button
             size="small"
@@ -243,7 +332,7 @@ const ConnectionsPage = () => {
             onClick={() => selectConnectionsType('closed')}
           >
             {t('connections.components.actions.closed')}{' '}
-            {connections?.closedConnections.length}
+            {viewConnections.closedConnections.length}
           </Button>
         </ButtonGroup>
         {!isTableLayout && (
@@ -270,6 +359,42 @@ const ConnectionsPage = () => {
         >
           <BaseSearchBox onSearch={handleSearch} />
         </Box>
+        <Button
+          size="small"
+          variant="contained"
+          startIcon={<RuleRounded fontSize="small" />}
+          disabled={ruleHosts.length === 0}
+          onClick={() => setIsRuleDialogOpen(true)}
+          sx={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}
+        >
+          {t('connections.components.actions.createRule')}
+          {ruleHosts.length > 0 ? ` (${ruleHosts.length})` : ''}
+        </Button>
+        <Tooltip
+          title={t(
+            paused
+              ? 'connections.components.actions.resume'
+              : 'connections.components.actions.pause',
+          )}
+        >
+          <IconButton
+            size="small"
+            color={paused ? 'primary' : 'inherit'}
+            aria-label={t(
+              paused
+                ? 'connections.components.actions.resume'
+                : 'connections.components.actions.pause',
+            )}
+            onClick={togglePause}
+            sx={{ flex: '0 0 auto' }}
+          >
+            {paused ? (
+              <PlayArrowRounded fontSize="small" />
+            ) : (
+              <PauseRounded fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
         {isTableLayout && hasTableData && (
           <Tooltip title={t('connections.components.columnManager.title')}>
             <IconButton
@@ -292,6 +417,9 @@ const ConnectionsPage = () => {
           onShowDetail={showDetailById}
           columnManagerOpen={isColumnManagerOpen}
           onCloseColumnManager={() => setIsColumnManagerOpen(false)}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
         />
       ) : (
         <VirtualList
@@ -303,6 +431,8 @@ const ConnectionsPage = () => {
               row={displayRows[i]}
               closed={connectionsType === 'closed'}
               onShowDetail={showDetailById}
+              selected={selectedIds.has(displayRows[i]?.id ?? '')}
+              onToggleSelect={toggleSelect}
             />
           )}
           style={{
@@ -314,6 +444,14 @@ const ConnectionsPage = () => {
         />
       )}
       <ConnectionDetail ref={detailRef} />
+      <ConnectionRuleDialog
+        open={isRuleDialogOpen}
+        hosts={ruleHosts}
+        skippedCount={skippedHosts}
+        rulesProperty={rulesProperty}
+        onClose={() => setIsRuleDialogOpen(false)}
+        onCreated={() => setSelectedIds(new Set())}
+      />
       <Zoom
         in={connectionsType === 'closed' && filterConn.length > 0}
         unmountOnExit
