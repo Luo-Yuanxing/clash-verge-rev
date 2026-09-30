@@ -13,6 +13,8 @@ import {
   styled,
 } from '@mui/material'
 
+import { parseRule } from './rule-fields'
+
 interface Props {
   type: 'prepend' | 'original' | 'delete' | 'append'
   ruleRaw: string
@@ -25,11 +27,7 @@ interface Props {
 export const RuleItem = (props: Props) => {
   const { type, ruleRaw, onDelete, onPrepend, onAppend, readOnly } = props
   const isSortable = !readOnly && (type === 'prepend' || type === 'append')
-  const rule = ruleRaw.replace(',no-resolve', '')
-
-  const ruleType = rule.match(/^[^,]+/)?.[0] ?? ''
-  const proxyPolicy = rule.match(/[^,]+$/)?.[0] ?? ''
-  const ruleContent = rule.slice(ruleType.length + 1, -proxyPolicy.length - 1)
+  const { type: ruleType, host, policy: proxyPolicy } = parseRule(ruleRaw)
 
   return (
     <ListItem
@@ -53,10 +51,10 @@ export const RuleItem = (props: Props) => {
         sx={{ cursor: isSortable ? 'move' : undefined }}
         primary={
           <StyledPrimary
-            title={ruleContent || '-'}
+            title={host || '-'}
             sx={{ textDecoration: type === 'delete' ? 'line-through' : '' }}
           >
-            {ruleContent || '-'}
+            {host || '-'}
           </StyledPrimary>
         }
         secondary={
