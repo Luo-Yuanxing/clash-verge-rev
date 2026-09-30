@@ -141,42 +141,27 @@ export const LayoutTraffic = () => {
           )}
 
           <Box
-            title={`${t('shared.labels.downloaded')} / ${t('shared.labels.uploaded')}`}
+            title={`${t('shared.labels.downloaded')}`}
             {...boxStyle}
-            sx={{ ...boxStyle.sx, gap: '2px', cursor: 'auto' }}
+            sx={{ ...boxStyle.sx, cursor: 'auto' }}
           >
             <CloudDownloadRounded {...iconStyle} color="primary" />
-            <Typography
-              {...valStyle}
-              color="primary"
-              sx={{ ...valStyle.sx, fontSize: '12px' }}
-            >
+            <Typography {...valStyle} color="primary">
               {downTotal}
             </Typography>
-            <Typography
-              {...unitStyle}
-              sx={{ ...unitStyle.sx, flex: '0 1 24px' }}
-            >
-              {downTotalUnit}
-            </Typography>
-            <CloudUploadRounded
-              {...iconStyle}
-              color="secondary"
-              sx={{ ...iconStyle.sx, mr: '4px', ml: 0.5 }}
-            />
-            <Typography
-              {...valStyle}
-              color="secondary"
-              sx={{ ...valStyle.sx, fontSize: '12px' }}
-            >
+            <Typography {...unitStyle}>{downTotalUnit}</Typography>
+          </Box>
+
+          <Box
+            title={`${t('shared.labels.uploaded')}`}
+            {...boxStyle}
+            sx={{ ...boxStyle.sx, cursor: 'auto' }}
+          >
+            <CloudUploadRounded {...iconStyle} color="secondary" />
+            <Typography {...valStyle} color="secondary">
               {upTotal}
             </Typography>
-            <Typography
-              {...unitStyle}
-              sx={{ ...unitStyle.sx, flex: '0 1 24px' }}
-            >
-              {upTotalUnit}
-            </Typography>
+            <Typography {...unitStyle}>{upTotalUnit}</Typography>
           </Box>
         </Box>
       </Box>
