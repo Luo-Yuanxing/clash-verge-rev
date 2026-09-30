@@ -31,6 +31,7 @@ const ERROR_KEYS = {
   invalid: 'profiles.page.quickConfig.feedback.invalid',
   profile: 'profiles.page.quickConfig.feedback.profileFailed',
   rules: 'profiles.page.quickConfig.feedback.rulesFailed',
+  restore: 'profiles.page.quickConfig.feedback.importBackupFailed',
 } as const
 
 const TOGGLE_SX = {

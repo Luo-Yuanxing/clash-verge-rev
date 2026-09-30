@@ -1,3 +1,4 @@
+import dayjs from 'dayjs'
 import * as yaml from 'js-yaml'
 
 import {
@@ -27,6 +28,13 @@ const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04]
 /** 压缩备份载荷的版本前缀，需与 src-tauri/src/feat/backup.rs 保持一致 */
 const QUICK_CONFIG_PREFIX = 'cv1:'
 
+/** 导入的备份文件名沿用 Verge 的 `{平台}-backup-{时间}.zip` 约定 */
+const QUICK_CONFIG_BACKUP_PREFIX = navigator.userAgent.includes('Mac')
+  ? 'macos'
+  : navigator.userAgent.includes('Linux')
+    ? 'linux'
+    : 'windows'
+
 export interface QuickConfigPayload {
   type: string
   version: number
@@ -42,7 +50,7 @@ export interface QuickConfigImportResult {
   backupFile: string | null
 }
 
-export type QuickConfigErrorCode = 'invalid' | 'profile' | 'rules'
+export type QuickConfigErrorCode = 'invalid' | 'profile' | 'rules' | 'restore'
 
 export class QuickConfigError extends Error {
   readonly code: QuickConfigErrorCode
@@ -161,20 +169,55 @@ const uniqueProfileName = (items: IProfileItem[], base: string): string => {
   return name
 }
 
+/** 校验并规范化备份载荷：去掉 `cv1:` 前缀与所有空白，非法字符直接判为无效 */
+const checkedBackupBody = (text: string): string => {
+  const body = text.replace(/^cv1:/u, '').replace(/\s+/gu, '')
+  if (!body || !/^[A-Za-z0-9+/]+={0,2}$/u.test(body)) {
+    throw new QuickConfigError('invalid')
+  }
+  return body
+}
+
+/** 备份目录里的时间戳文件名，重名时追加 `-import` / `-import2` */
+const uniqueBackupFileName = (existing: Set<string>): string => {
+  const stamp = dayjs().format('YYYY-MM-DD_HH-mm-ss')
+  let name = `${QUICK_CONFIG_BACKUP_PREFIX}-backup-${stamp}.zip`
+  if (!existing.has(name)) return name
+
+  name = name.replace(/\.zip$/u, '-import.zip')
+  for (let index = 2; existing.has(name); index += 1) {
+    name = name.replace(/-import\d*\.zip$/u, `-import${index}.zip`)
+  }
+  return name
+}
+
 /**
  * 导入配置：Verge 备份先解码再落到本地备份目录（复用原有导入函数），
  * JSON 快捷配置则把 `custom-rule` 挂到新建的订阅（名字取 Base64 前 8 位）上。
  */
 export const importQuickConfig = async (
-  base64: string,
+  raw: string,
 ): Promise<QuickConfigImportResult> => {
+  const base64 = raw.replace(/\s+/gu, '')
+  if (!base64) throw new QuickConfigError('invalid')
+
   if (isBackupPayload(base64)) {
+    const body = checkedBackupBody(base64)
+    const filename = uniqueBackupFileName(
+      new Set((await listLocalBackup()).map((item) => item.filename)),
+    )
+
     try {
-      const filename = await writeLocalBackupBase64(base64)
-      const backupFile = await importLocalBackup(filename)
-      return { name: null, backupFile: backupFile || filename }
+      await writeLocalBackupBase64(filename, body)
     } catch {
       throw new QuickConfigError('invalid')
+    }
+
+    try {
+      const imported = await importLocalBackup(filename)
+      return { name: null, backupFile: imported || filename }
+    } catch {
+      throw new QuickConfigError('restore')
     }
   }
 
@@ -184,9 +227,7 @@ export const importQuickConfig = async (
     return { name: null, backupFile: null }
   }
 
-  const nameBase = base64
-    .replace(/\s+/gu, '')
-    .slice(0, QUICK_CONFIG_NAME_LENGTH)
+  const nameBase = base64.slice(0, QUICK_CONFIG_NAME_LENGTH)
   const profiles = await getProfiles()
   const name = uniqueProfileName(profiles.items ?? [], nameBase)
 

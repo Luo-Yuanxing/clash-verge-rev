@@ -403,8 +403,11 @@ export async function readLocalBackupBase64(filename: string) {
   return invoke<string>('read_local_backup_base64', { filename })
 }
 
-export async function writeLocalBackupBase64(content: string) {
-  return invoke<string>('write_local_backup_base64', { content })
+export async function writeLocalBackupBase64(
+  filename: string,
+  content: string,
+) {
+  return invoke<string>('write_local_backup_base64', { filename, content })
 }
 
 export async function saveWebdavConfig(

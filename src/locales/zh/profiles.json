@@ -40,7 +40,8 @@
         "imported": "导入完成，新订阅：{{name}}",
         "importedBackup": "备份已导入：{{name}}，可在设置-备份中恢复",
         "nothingToImport": "配置里没有可导入的内容",
-        "invalid": "不是有效的快捷配置",
+        "invalid": "不是有效的快捷配置（Base64 内容不完整或已损坏）",
+        "importBackupFailed": "导入备份文件失败",
         "profileFailed": "创建订阅失败",
         "rulesFailed": "写入自定义规则失败",
         "failed": "操作失败"

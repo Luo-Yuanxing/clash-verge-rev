@@ -532,6 +532,7 @@ export interface TranslationResources {
           feedback: {
             exported: string
             failed: string
+            importBackupFailed: string
             imported: string
             importedBackup: string
             invalid: string

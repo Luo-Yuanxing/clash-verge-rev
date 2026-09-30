@@ -40,7 +40,8 @@
         "imported": "Import finished, new profile: {{name}}",
         "importedBackup": "Backup imported: {{name}}, restore it from Settings - Backup",
         "nothingToImport": "Nothing to import in this config",
-        "invalid": "Not a valid quick config",
+        "invalid": "Not a valid quick config (the Base64 payload is incomplete or corrupted)",
+        "importBackupFailed": "Failed to import the backup file",
         "profileFailed": "Failed to create profile",
         "rulesFailed": "Failed to write custom rules",
         "failed": "Operation failed"
