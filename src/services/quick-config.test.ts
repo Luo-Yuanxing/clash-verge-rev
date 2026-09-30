@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  createProfile,
+  getProfiles,
   listLocalBackup,
   restoreLocalBackup,
   writeLocalBackupBase64,
@@ -131,21 +133,47 @@ describe('importQuickConfig scope check', () => {
 })
 
 describe('importQuickConfig backup payload', () => {
-  it('restores the settings backup by file name', async () => {
+  const backupText = (): string =>
+    `cv1:${encode('settings')}\n#rules=${encode('[]')}`
+
+  const stubRestore = (names: string[] = []): void => {
     vi.mocked(listLocalBackup).mockResolvedValue([])
     vi.mocked(writeLocalBackupBase64).mockImplementation(async (name) => name)
     vi.mocked(restoreLocalBackup).mockResolvedValue()
+    vi.mocked(createProfile).mockResolvedValue()
+    vi.mocked(getProfiles).mockResolvedValue({
+      items: names.map((name) => ({ name })),
+      current: '',
+    } as unknown as IProfilesConfig)
+  }
 
-    const backup = `cv1:${encode('settings')}\n#rules=${encode('[]')}`
+  it('restores the settings and creates an empty profile named after the payload', async () => {
+    stubRestore()
 
-    await expect(importQuickConfig(backup, 'all')).resolves.toEqual({
-      name: null,
+    const text = backupText()
+
+    await expect(importQuickConfig(text, 'all')).resolves.toEqual({
+      name: text.slice(0, 8),
       backupFile: expect.stringMatching(/\.zip$/u),
-      rulesApplied: 0,
     })
     // 恢复按备份目录里的文件名查找，传路径会报 Backup file not found
     expect(restoreLocalBackup).toHaveBeenCalledWith(
       expect.stringMatching(/\.zip$/u),
     )
+    // 载荷里的规则字符串不导入
+    expect(createProfile).toHaveBeenCalledWith({
+      type: 'local',
+      name: text.slice(0, 8),
+      desc: '',
+    })
+  })
+
+  it('appends `*` when the profile name is already taken', async () => {
+    const text = backupText()
+    stubRestore([text.slice(0, 8)])
+
+    await expect(importQuickConfig(text, 'all')).resolves.toMatchObject({
+      name: `${text.slice(0, 8)}*`,
+    })
   })
 })
