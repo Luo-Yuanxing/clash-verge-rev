@@ -13,6 +13,10 @@
         "host": "主机",
         "type": "规则类型",
         "policy": "代理策略"
+      },
+      "order": {
+        "byDomain": "按域名层级排序",
+        "original": "显示原始顺序"
       }
     }
   },

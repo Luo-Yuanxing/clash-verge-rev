@@ -13,6 +13,10 @@
         "host": "Host",
         "type": "Rule type",
         "policy": "Proxy policy"
+      },
+      "order": {
+        "byDomain": "Sort by domain level",
+        "original": "Show original order"
       }
     }
   },

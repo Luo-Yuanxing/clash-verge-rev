@@ -1,9 +1,11 @@
-import { Box, Chip, Typography } from '@mui/material'
+import { SortRounded } from '@mui/icons-material'
+import { Box, Button, Chip, Typography } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseEmpty, BasePage, BaseSearchBox, Switch } from '@/components/base'
+import { compareRulesByHostLevel } from '@/components/profile/rule-fields'
 import {
   readSeqRulesDocument,
   serializeSeqRules,
@@ -33,6 +35,8 @@ const CustomRulesPage = () => {
   )
 
   const [pickedUid, setPickedUid] = useState('')
+  /** 默认按域名层级排序，可切回规则命中的原始顺序 */
+  const [order, setOrder] = useState<'domain' | 'original'>('domain')
 
   useEffect(() => {
     void mutateProfiles()
@@ -69,10 +73,13 @@ const CustomRulesPage = () => {
     [prependSeq, appendSeq],
   )
 
-  const filteredRows = useMemo(
-    () => rows.filter(({ rule }) => match(rule)),
-    [rows, match],
-  )
+  const filteredRows = useMemo(() => {
+    const matched = rows.filter(({ rule }) => match(rule))
+    // 原始顺序即规则命中的顺序（prepend → append）
+    if (order === 'original') return matched
+
+    return [...matched].sort((a, b) => compareRulesByHostLevel(a.rule, b.rule))
+  }, [rows, match, order])
 
   /** 删除单条自定义规则并写回文件 */
   const handleDeleteRule = useLockFn(async ({ rule, source }: SeqRuleRow) => {
@@ -211,7 +218,24 @@ const CustomRulesPage = () => {
               flexDirection: 'column',
             }}
           >
-            <BaseSearchBox onSearch={(next) => setMatch(() => next)} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <BaseSearchBox onSearch={(next) => setMatch(() => next)} />
+              </Box>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<SortRounded />}
+                sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                onClick={() =>
+                  setOrder(order === 'domain' ? 'original' : 'domain')
+                }
+              >
+                {order === 'domain'
+                  ? t('rules.custom.page.order.original')
+                  : t('rules.custom.page.order.byDomain')}
+              </Button>
+            </Box>
             <Box sx={{ height: 'calc(100% - 32px)', marginTop: '8px' }}>
               <SeqRulesTable
                 rows={filteredRows}

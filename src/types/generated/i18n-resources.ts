@@ -651,6 +651,10 @@ export interface TranslationResources {
             hint: string
             label: string
           }
+          order: {
+            byDomain: string
+            original: string
+          }
           title: string
         }
       }
