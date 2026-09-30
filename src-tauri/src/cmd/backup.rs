@@ -43,6 +43,6 @@ pub async fn read_local_backup_base64(filename: String) -> CmdResult<String> {
 
 /// Materialize a Base64 payload into the local backup directory, returning the file name.
 #[tauri::command]
-pub async fn write_local_backup_base64(content: String) -> CmdResult<String> {
-    feat::write_local_backup_base64(content).await.stringify_err()
+pub async fn write_local_backup_base64(filename: String, content: String) -> CmdResult<String> {
+    feat::write_local_backup_base64(filename, content).await.stringify_err()
 }
