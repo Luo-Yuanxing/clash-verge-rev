@@ -57,3 +57,7 @@ pnpm typecheck && pnpm lint && pnpm format:check && pnpm test
 ```
 
 后端 Rust 改动追加 `cargo clippy-all`。检查通过即可提交，无需额外流程。
+
+## 提交风格
+
+参考历史,但一律使用中文作为提交消息
