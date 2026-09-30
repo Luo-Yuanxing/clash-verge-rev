@@ -189,7 +189,6 @@
           "copyVersion": "复制 Verge 版本号"
         },
         "notifications": {
-          "latestVersion": "当前已是最新版本",
           "versionCopied": "Verge 版本已复制到剪贴板"
         },
         "fields": {
@@ -198,7 +197,6 @@
           "openConfDir": "配置目录",
           "openCoreDir": "内核目录",
           "openLogsDir": "日志目录",
-          "checkUpdates": "检查更新",
           "openDevTools": "开发者工具",
           "exit": "退出",
           "exportDiagnostics": "导出诊断信息",
@@ -388,7 +386,6 @@
         "appLogMaxSize": "应用日志最大大小",
         "appLogMaxCount": "应用日志最大数量",
         "autoCloseConnections": "自动关闭连接",
-        "autoCheckUpdate": "自动检查更新",
         "enableBuiltinEnhanced": "内置增强功能",
         "proxyLayoutColumns": "代理页布局列数",
         "autoLogClean": "自动清理日志",
@@ -411,24 +408,6 @@
           "never": "不清理",
           "retainDays": "保留 {{n}} 天"
         }
-      }
-    },
-    "update": {
-      "title": "新版本 v{{version}}",
-      "actions": {
-        "goToRelease": "前往发布页",
-        "update": "更新"
-      },
-      "messages": {
-        "breakChangeError": "此版本为重大更新，不支持应用内更新，请卸载后手动下载安装",
-        "available": "有新版本可用"
-      },
-      "alerts": {
-        "note": "备注",
-        "tip": "提示",
-        "important": "重要",
-        "warning": "警告",
-        "caution": "注意"
       }
     },
     "sysproxy": {
