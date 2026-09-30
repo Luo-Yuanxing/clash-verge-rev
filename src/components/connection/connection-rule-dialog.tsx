@@ -27,7 +27,7 @@ import {
   toSeqConfig,
 } from '@/components/profile/seq-rules-document'
 import { useProfiles } from '@/hooks/use-profiles'
-import { restartCore, saveProfileFile } from '@/services/cmds'
+import { saveRulesFile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
 const RULE_TYPES = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD'] as const
@@ -200,32 +200,48 @@ export const ConnectionRuleDialog = (props: Props) => {
       // 固定为前置规则
       const nextPrepend = [...created, ...prepend]
 
-      if (
-        !(await saveProfileFile(
-          rulesProperty,
-          serializeSeqRules({
-            prepend: nextPrepend,
-            append,
-            delete: deleteList,
-            disabled,
-            excludeSubscriptionRules,
-          }),
-        ))
-      ) {
+      const outcome = await saveRulesFile(
+        rulesProperty,
+        serializeSeqRules({
+          prepend: nextPrepend,
+          append,
+          delete: deleteList,
+          disabled,
+          excludeSubscriptionRules,
+        }),
+      )
+
+      if (outcome.status === 'invalid') {
         showNotice.error(
           t('connections.components.ruleDialog.errors.saveFailed'),
         )
         return
       }
 
-      // 新增的规则要重启内核才会生效
-      await restartCore().catch((err) => showNotice.error(err))
+      if (outcome.status === 'busy') {
+        showNotice.warning(
+          t('connections.components.ruleDialog.notifications.pending'),
+        )
+      } else if (rulesProperty === current?.option?.rules) {
+        showNotice.success(
+          t('connections.components.ruleDialog.notifications.created', {
+            count: created.length,
+          }),
+        )
+      } else {
+        showNotice.success(
+          t(
+            'connections.components.ruleDialog.notifications.createdForProfile',
+            {
+              count: created.length,
+              name:
+                items.find((item) => item.uid === selectedUid)?.name ??
+                selectedUid,
+            },
+          ),
+        )
+      }
 
-      showNotice.success(
-        t('connections.components.ruleDialog.notifications.created', {
-          count: created.length,
-        }),
-      )
       setPickedUid(selectedUid)
       onCreated?.(created.length)
       onClose()
