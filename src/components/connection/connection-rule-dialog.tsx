@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getGroups } from 'tauri-plugin-mihomo-api'
 
+import { normalizeDomainSuffix } from '@/components/profile/rule-fields'
 import {
   readSeqRulesDocument,
   serializeSeqRules,
@@ -145,10 +146,17 @@ export const ConnectionRuleDialog = (props: Props) => {
 
   const resolvedPolicy = policyOption === 'PROXY' ? selectedGroup : policyOption
 
-  const rules = useMemo(
-    () => hosts.map((host) => `${ruleType},${host},${resolvedPolicy}`),
-    [hosts, ruleType, resolvedPolicy],
-  )
+  const rules = useMemo(() => {
+    const list: string[] = []
+    for (const host of hosts) {
+      // 域名后缀规则只保留最后两级域名，截断后可能与其他主机重复
+      const value =
+        ruleType === 'DOMAIN-SUFFIX' ? normalizeDomainSuffix(host) : host
+      const rule = `${ruleType},${value},${resolvedPolicy}`
+      if (!list.includes(rule)) list.push(rule)
+    }
+    return list
+  }, [hosts, ruleType, resolvedPolicy])
 
   const handleCreate = useLockFn(async () => {
     if (!rulesProperty) {
