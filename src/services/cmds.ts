@@ -290,6 +290,11 @@ export async function cmdTestDelay(url: string) {
   return invoke<number>('test_delay', { url })
 }
 
+/** 主动探测：目标需在 timeoutMs 内返回响应，否则 invoke 报错 */
+export async function cmdTestHostResponse(url: string, timeoutMs: number) {
+  return invoke<number>('test_host_response', { url, timeoutMs })
+}
+
 export async function invoke_uwp_tool() {
   return invoke<void>('invoke_uwp_tool').catch((err) =>
     showNotice.error(err, 1500),

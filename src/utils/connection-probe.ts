@@ -1,11 +1,8 @@
-import { cmdTestDelay } from '@/services/cmds'
+import { cmdTestHostResponse } from '@/services/cmds'
 import { formatHostPort, normalizeHost } from '@/utils/network'
 
 /** 主动探测窗口：5s 内没有响应即视为被墙 */
 export const HOST_PROBE_WINDOW_MS = 5_000
-
-/** 后端 test_delay 出错时返回的哨兵值 */
-const BACKEND_ERROR_DELAY = 10_000
 
 export type HostProbeError = 'timeout' | 'unreachable'
 
@@ -53,30 +50,36 @@ export const probeUrlOf = (
   return `${scheme}://${formatHostPort(name, port)}/`
 }
 
+/** 发起一次探测请求，resolve 即代表窗口内收到了响应 */
+export type HostProbeRequest = (target: HostProbeTarget) => Promise<unknown>
+
+export const requestHostResponse: HostProbeRequest = (target) =>
+  cmdTestHostResponse(target.url, HOST_PROBE_WINDOW_MS)
+
 /**
  * 探测单个主机：请求与 5s 窗口竞速。
- * 后端不带超时参数，超出窗口的响应到这里已被判为失败，结果会被丢弃。
+ * 后端本身也按同一个窗口超时，这里的定时器保证窗口一到就出结果，
+ * 不会出现「5s 之后几秒才变色」。
  */
 export const probeHost = async (
   target: HostProbeTarget,
+  request: HostProbeRequest = requestHostResponse,
 ): Promise<HostProbeResult> => {
   const startedAt = Date.now()
   let timer: ReturnType<typeof setTimeout> | null = null
 
   try {
-    const outcome = await Promise.race([
-      cmdTestDelay(target.url).then((delay) => ({ delay }) as const),
-      new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), HOST_PROBE_WINDOW_MS)
+    const responded = await Promise.race([
+      request(target).then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), HOST_PROBE_WINDOW_MS)
       }),
     ])
     const elapsed = Date.now() - startedAt
 
-    if (!outcome) return { ok: false, error: 'timeout', elapsed }
-    if (outcome.delay >= BACKEND_ERROR_DELAY) {
-      return { ok: false, error: 'unreachable', elapsed }
-    }
-    return { ok: true, elapsed }
+    return responded
+      ? { ok: true, elapsed }
+      : { ok: false, error: 'timeout', elapsed }
   } catch {
     return { ok: false, error: 'unreachable', elapsed: Date.now() - startedAt }
   } finally {
@@ -91,9 +94,10 @@ export const runHostProbes = async (
     concurrency?: number
     onResult?: (host: string, result: HostProbeResult) => void
     signal?: AbortSignal
+    request?: HostProbeRequest
   },
 ) => {
-  const { concurrency = 8, onResult, signal } = options ?? {}
+  const { concurrency = 8, onResult, signal, request } = options ?? {}
   const queued = new Set<string>()
   const unique = targets.filter((target) => {
     if (!target.host || queued.has(target.host)) return false
@@ -108,7 +112,7 @@ export const runHostProbes = async (
       cursor += 1
       if (signal?.aborted) return
 
-      const result = await probeHost(target)
+      const result = await probeHost(target, request)
       if (signal?.aborted) return
       onResult?.(target.host, result)
     }
