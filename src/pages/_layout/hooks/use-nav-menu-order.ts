@@ -39,11 +39,24 @@ const resolveMenuOrder = <T extends { path: string }>(
     }
   }
 
-  for (const path of defaultOrder) {
-    if (!seen.has(path)) {
-      resolved.push(path)
-      seen.add(path)
+  // A stored order cannot know about items added by a newer version, so each
+  // unknown item keeps its default position instead of being appended last.
+  for (const [index, path] of defaultOrder.entries()) {
+    if (seen.has(path)) {
+      continue
     }
+
+    let insertAt = 0
+    for (let i = index - 1; i >= 0; i--) {
+      const position = resolved.indexOf(defaultOrder[i])
+      if (position !== -1) {
+        insertAt = position + 1
+        break
+      }
+    }
+
+    resolved.splice(insertAt, 0, path)
+    seen.add(path)
   }
 
   return resolved
