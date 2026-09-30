@@ -290,6 +290,11 @@ interface ISeqProfileConfig {
   prepend: []
   append: []
   delete: []
+  /** 已关闭的自定义规则，按来源分别保存，重新启用时放回原序列 */
+  disabled?: {
+    prepend?: string[]
+    append?: string[]
+  }
   /** 完全排除订阅规则，未命中一律直连 */
   'exclude-subscription-rules'?: boolean
 }

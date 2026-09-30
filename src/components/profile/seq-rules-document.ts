@@ -20,10 +20,23 @@ export const readSeqRulesDocument = async (
   return { raw, config }
 }
 
+/** 已关闭的自定义规则，按来源分别保存 */
+export interface SeqRulesDisabled {
+  prepend: string[]
+  append: string[]
+}
+
+export const emptySeqRulesDisabled = (): SeqRulesDisabled => ({
+  prepend: [],
+  append: [],
+})
+
 export interface SeqRulesConfig {
   prepend: string[]
   append: string[]
   delete: string[]
+  /** 关闭的规则不写入 prepend/append，因此不参与运行时匹配 */
+  disabled: SeqRulesDisabled
   /** 开启后完全使用自定义规则，订阅规则不参与，未命中一律直连 */
   excludeSubscriptionRules: boolean
 }
@@ -34,22 +47,33 @@ export const toSeqConfig = (
   prepend: config?.prepend ?? [],
   append: config?.append ?? [],
   delete: config?.delete ?? [],
+  disabled: {
+    prepend: config?.disabled?.prepend ?? [],
+    append: config?.disabled?.append ?? [],
+  },
   excludeSubscriptionRules: config?.['exclude-subscription-rules'] ?? false,
 })
 
 /** 序列化 Rules 配置文件，与可视化编辑器保持一致 */
-export const serializeSeqRules = (config: SeqRulesConfig): string =>
-  yaml.dump(
+export const serializeSeqRules = (config: SeqRulesConfig): string => {
+  const { disabled } = config
+  const hasDisabled = disabled.prepend.length > 0 || disabled.append.length > 0
+
+  return yaml.dump(
     {
       prepend: config.prepend,
       append: config.append,
       delete: config.delete,
+      ...(hasDisabled
+        ? { disabled: { prepend: disabled.prepend, append: disabled.append } }
+        : {}),
       ...(config.excludeSubscriptionRules
         ? { 'exclude-subscription-rules': true }
         : {}),
     },
     { forceQuotes: true },
   )
+}
 
 /**
  * 依次检查候选订阅的规则文件，返回第一个有自定义规则（prepend/append 非空）的 uid；

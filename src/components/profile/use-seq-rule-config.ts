@@ -4,7 +4,9 @@ import { showNotice } from '@/services/notice-service'
 import { parseYamlSafe } from '@/utils/yaml'
 
 import {
+  emptySeqRulesDisabled,
   readSeqRulesDocument,
+  type SeqRulesDisabled,
   serializeSeqRules,
   toSeqConfig,
 } from './seq-rules-document'
@@ -21,6 +23,9 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
   const [prependSeq, setPrependSeq] = useState<string[]>([])
   const [appendSeq, setAppendSeq] = useState<string[]>([])
   const [deleteSeq, setDeleteSeq] = useState<string[]>([])
+  const [disabledSeq, setDisabledSeq] = useState<SeqRulesDisabled>(
+    emptySeqRulesDisabled,
+  )
   const [excludeSubscriptionRules, setExcludeSubscriptionRules] =
     useState(false)
   const [ruleList, setRuleList] = useState<string[]>([])
@@ -46,12 +51,14 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
         prepend,
         append,
         delete: removed,
+        disabled,
         excludeSubscriptionRules,
       } = toSeqConfig(config)
       hasLoadedSeqConfigRef.current = true
       setPrependSeq(prepend)
       setAppendSeq(append)
       setDeleteSeq(removed)
+      setDisabledSeq(disabled)
       setExcludeSubscriptionRules(excludeSubscriptionRules)
     })()
   }, [active, property])
@@ -75,12 +82,14 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
       prepend,
       append,
       delete: removed,
+      disabled,
       excludeSubscriptionRules: exclude,
     } = toSeqConfig(config)
     hasLoadedSeqConfigRef.current = true
     setPrependSeq(prepend)
     setAppendSeq(append)
     setDeleteSeq(removed)
+    setDisabledSeq(disabled)
     setExcludeSubscriptionRules(exclude)
     setVisualization(true)
   }
@@ -95,11 +104,13 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
         prepend,
         append,
         delete: removed,
+        disabled,
         excludeSubscriptionRules,
       } = toSeqConfig(config)
       setPrependSeq(prepend)
       setAppendSeq(append)
       setDeleteSeq(removed)
+      setDisabledSeq(disabled)
       setExcludeSubscriptionRules(excludeSubscriptionRules)
     }
   }, [property])
@@ -125,6 +136,7 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
             prepend: prependSeq,
             append: appendSeq,
             delete: deleteSeq,
+            disabled: disabledSeq,
             excludeSubscriptionRules,
           }),
         )
@@ -147,7 +159,7 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
         clearTimeout(timeoutId)
       }
     }
-  }, [prependSeq, appendSeq, deleteSeq, excludeSubscriptionRules])
+  }, [prependSeq, appendSeq, deleteSeq, disabledSeq, excludeSubscriptionRules])
 
   return {
     prevData,
@@ -163,6 +175,8 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
     setAppendSeq,
     deleteSeq,
     setDeleteSeq,
+    disabledSeq,
+    setDisabledSeq,
     excludeSubscriptionRules,
     setExcludeSubscriptionRules,
     ruleList,

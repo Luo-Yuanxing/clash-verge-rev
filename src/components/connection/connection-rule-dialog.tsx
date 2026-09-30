@@ -148,6 +148,7 @@ export const ConnectionRuleDialog = (props: Props) => {
         prepend,
         append,
         delete: deleteList,
+        disabled,
         excludeSubscriptionRules,
       } = toSeqConfig(config)
 
@@ -176,6 +177,7 @@ export const ConnectionRuleDialog = (props: Props) => {
             prepend: nextPrepend,
             append,
             delete: deleteList,
+            disabled,
             excludeSubscriptionRules,
           }),
         ))

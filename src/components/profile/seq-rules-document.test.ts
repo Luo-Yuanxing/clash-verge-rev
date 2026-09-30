@@ -1,8 +1,12 @@
+import * as yaml from 'js-yaml'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
   findFirstNonEmptyRulesUid,
+  type SeqRulesConfig,
   type SeqRulesDocument,
+  serializeSeqRules,
+  toSeqConfig,
 } from './seq-rules-document'
 
 vi.mock('@/services/cmds', () => ({ readProfileFile: vi.fn() }))
@@ -52,5 +56,38 @@ describe('findFirstNonEmptyRulesUid', () => {
     const read = reader({ b: rules(['DOMAIN,x.com,DIRECT']) })
 
     await expect(findFirstNonEmptyRulesUid(candidates, read)).resolves.toBe('b')
+  })
+})
+
+const config = (overrides: Partial<SeqRulesConfig> = {}): SeqRulesConfig => ({
+  prepend: [],
+  append: [],
+  delete: [],
+  disabled: { prepend: [], append: [] },
+  excludeSubscriptionRules: false,
+  ...overrides,
+})
+
+describe('serializeSeqRules', () => {
+  it('keeps closed rules under disabled instead of prepend/append', () => {
+    const text = serializeSeqRules(
+      config({
+        prepend: ['DOMAIN,on.com,DIRECT'],
+        disabled: { prepend: ['DOMAIN,off.com,DIRECT'], append: [] },
+      }),
+    )
+    const parsed = yaml.load(text) as ISeqProfileConfig
+
+    expect(parsed.prepend).toEqual(['DOMAIN,on.com,DIRECT'])
+    expect(toSeqConfig(parsed).disabled).toEqual({
+      prepend: ['DOMAIN,off.com,DIRECT'],
+      append: [],
+    })
+  })
+
+  it('omits the disabled key when no rule is closed', () => {
+    const parsed = yaml.load(serializeSeqRules(config()))
+
+    expect(parsed).not.toHaveProperty('disabled')
   })
 })
