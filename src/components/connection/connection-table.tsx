@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type TouchEvent as ReactTouchEvent,
   type UIEvent as ReactUIEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -33,13 +32,10 @@ import {
 
 const ROW_HEIGHT = 40
 const SELECT_COLUMN_WIDTH = 40
-const RESIZE_HANDLE_WIDTH = 6
 const OVERSCAN_ROWS = 6
 const MAX_ROW_SNAPSHOT_CACHE_SIZE = 2_000
 /** 单元格左右各 8px 内边距 */
 const CELL_PADDING_WIDTH = 16
-/** 链路表头除列名外还要放下当前值与下拉箭头 */
-const CHAIN_HEADER_EXTRA_WIDTH = 80
 const CELL_FONT_SIZE = 13
 const MAX_TEXT_WIDTH_CACHE_SIZE = 2_000
 
@@ -66,7 +62,6 @@ type ColumnField =
   | 'remoteDestination'
   | 'type'
 
-type ColumnSizingState = Record<string, number>
 type VisibilityState = Record<string, boolean>
 
 interface BaseColumn {
@@ -110,15 +105,10 @@ interface TableRowSnapshot {
 
 const resolveColumnSize = (
   column: BaseColumn,
-  storedSize: number | undefined,
   autoSize: number | undefined,
 ) => {
   const bounded = (size: number) =>
     column.maxWidth === undefined ? size : Math.min(column.maxWidth, size)
-
-  if (typeof storedSize === 'number' && Number.isFinite(storedSize)) {
-    return bounded(Math.max(column.minWidth, storedSize))
-  }
 
   if (typeof autoSize === 'number' && Number.isFinite(autoSize)) {
     return bounded(Math.max(column.minWidth, autoSize))
@@ -303,27 +293,8 @@ const ChainFilterSelect = (props: ChainFilterSelectProps) => {
       value={value}
       onChange={(event) => onChange(event.target.value)}
       aria-label={t('connections.components.chains.filter')}
-      renderValue={(selected) => (
-        <span
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            minWidth: 0,
-          }}
-        >
-          <span style={{ fontWeight: 600 }}>{label}</span>
-          <span
-            style={{
-              fontWeight: 400,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {selected || allChains}
-          </span>
-        </span>
+      renderValue={() => (
+        <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</span>
       )}
       sx={{
         flex: 1,
@@ -480,10 +451,6 @@ export const ConnectionTable = (props: Props) => {
   )
   const { t } = useTranslation()
   const theme = useTheme()
-  const [columnWidths, setColumnWidths] = useLocalStorage<ColumnSizingState>(
-    'connection-table-widths',
-    {},
-  )
 
   const [columnVisibilityModel, setColumnVisibilityModel] =
     useLocalStorage<VisibilityState>(
@@ -563,9 +530,8 @@ export const ConnectionTable = (props: Props) => {
       {
         field: 'chains',
         headerName: t('connections.components.fields.chains'),
-        width: 280,
-        minWidth: 100,
-        autoWidth: true,
+        width: 120,
+        minWidth: 90,
       },
       {
         field: 'rule',
@@ -678,10 +644,7 @@ export const ConnectionTable = (props: Props) => {
     for (const column of baseColumns) {
       if (!column.autoWidth) continue
 
-      const headerExtra =
-        column.field === 'chains' ? CHAIN_HEADER_EXTRA_WIDTH : 0
-      let width =
-        measureText(column.headerName) + headerExtra + CELL_PADDING_WIDTH
+      let width = measureText(column.headerName) + CELL_PADDING_WIDTH
 
       for (const connection of connections) {
         const text = String(
@@ -705,25 +668,21 @@ export const ConnectionTable = (props: Props) => {
   })
 
   /** 列宽先按内容与固定值算出，再等比拉伸填满窗口 */
-  const { columns: visibleColumns, columnScale } = useMemo(() => {
+  const visibleColumns = useMemo(() => {
     const columns = orderedColumns
       .filter((column) => isColumnVisible(column, columnVisibilityModel))
       .map((column) => ({
         ...column,
-        size: resolveColumnSize(
-          column,
-          columnWidths?.[column.field],
-          autoColumnWidths.get(column.field),
-        ),
+        size: resolveColumnSize(column, autoColumnWidths.get(column.field)),
       }))
 
     const total = columns.reduce((sum, column) => sum + column.size, 0)
     const available = viewport.width - SELECT_COLUMN_WIDTH
-    if (total === 0 || available <= total) return { columns, columnScale: 1 }
+    if (total === 0 || available <= total) return columns
 
     const scale = available / total
     let used = 0
-    const scaled = columns.map((column, index) => {
+    return columns.map((column, index) => {
       // 最后一列吸收取整余量，避免总和超出容器
       if (index === columns.length - 1) {
         return { ...column, size: available - used }
@@ -732,15 +691,7 @@ export const ConnectionTable = (props: Props) => {
       used += size
       return { ...column, size }
     })
-
-    return { columns: scaled, columnScale: scale }
-  }, [
-    columnVisibilityModel,
-    columnWidths,
-    orderedColumns,
-    autoColumnWidths,
-    viewport.width,
-  ])
+  }, [columnVisibilityModel, orderedColumns, autoColumnWidths, viewport.width])
 
   const [sorting, setSorting] = useState<SortingState | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -901,9 +852,8 @@ export const ConnectionTable = (props: Props) => {
   const handleResetColumns = useCallback(() => {
     setColumnVisibilityModel({})
     setColumnOrder(baseColumns.map((column) => column.field))
-    setColumnWidths({})
     setSorting(null)
-  }, [baseColumns, setColumnOrder, setColumnVisibilityModel, setColumnWidths])
+  }, [baseColumns, setColumnOrder, setColumnVisibilityModel])
 
   const managerColumns = useMemo<ConnectionColumnOption[]>(() => {
     return orderedColumns.map((column) => ({
@@ -913,81 +863,6 @@ export const ConnectionTable = (props: Props) => {
       toggleVisibility: (visible) => setColumnVisibility(column.field, visible),
     }))
   }, [columnVisibilityModel, orderedColumns, setColumnVisibility])
-
-  const startResize = useCallback(
-    (
-      field: ColumnField,
-      startClientX: number,
-      startWidth: number,
-      minWidth: number,
-      maxWidth: number | undefined,
-      scale: number,
-    ) => {
-      const handleMove = (clientX: number) => {
-        const nextWidth = Math.max(
-          minWidth,
-          startWidth + (clientX - startClientX) / scale,
-        )
-        setColumnWidths((prev) => ({
-          ...(prev ?? {}),
-          [field]: maxWidth ? Math.min(maxWidth, nextWidth) : nextWidth,
-        }))
-      }
-
-      const handleMouseMove = (event: MouseEvent) => handleMove(event.clientX)
-      const handleTouchMove = (event: TouchEvent) => {
-        const touch = event.touches[0]
-        if (touch) handleMove(touch.clientX)
-      }
-      const cleanup = () => {
-        window.removeEventListener('mousemove', handleMouseMove)
-        window.removeEventListener('mouseup', cleanup)
-        window.removeEventListener('touchmove', handleTouchMove)
-        window.removeEventListener('touchend', cleanup)
-        window.removeEventListener('touchcancel', cleanup)
-      }
-
-      window.addEventListener('mousemove', handleMouseMove)
-      window.addEventListener('mouseup', cleanup)
-      window.addEventListener('touchmove', handleTouchMove, { passive: true })
-      window.addEventListener('touchend', cleanup)
-      window.addEventListener('touchcancel', cleanup)
-    },
-    [setColumnWidths],
-  )
-
-  const handleResizeMouseDown = useCallback(
-    (column: DisplayColumn, event: ReactMouseEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      event.stopPropagation()
-      startResize(
-        column.field,
-        event.clientX,
-        column.size / columnScale,
-        column.minWidth,
-        column.maxWidth,
-        columnScale,
-      )
-    },
-    [columnScale, startResize],
-  )
-
-  const handleResizeTouchStart = useCallback(
-    (column: DisplayColumn, event: ReactTouchEvent<HTMLDivElement>) => {
-      event.stopPropagation()
-      const touch = event.touches[0]
-      if (!touch) return
-      startResize(
-        column.field,
-        touch.clientX,
-        column.size / columnScale,
-        column.minWidth,
-        column.maxWidth,
-        columnScale,
-      )
-    },
-    [columnScale, startResize],
-  )
 
   const borderColor = theme.palette.divider
   const headerBackground = theme.palette.background.paper
@@ -1051,7 +926,6 @@ export const ConnectionTable = (props: Props) => {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      position: 'relative',
                       boxSizing: 'border-box',
                       flex: `0 0 ${column.size}px`,
                       minWidth: column.minWidth,
@@ -1100,23 +974,6 @@ export const ConnectionTable = (props: Props) => {
                           : null}
                       </button>
                     )}
-                    <div
-                      onMouseDown={(event) =>
-                        handleResizeMouseDown(column, event)
-                      }
-                      onTouchStart={(event) =>
-                        handleResizeTouchStart(column, event)
-                      }
-                      style={{
-                        cursor: 'col-resize',
-                        position: 'absolute',
-                        right: 0,
-                        top: 0,
-                        width: RESIZE_HANDLE_WIDTH,
-                        height: '100%',
-                        transform: 'translateX(50%)',
-                      }}
-                    />
                   </div>
                 ))}
               </div>
