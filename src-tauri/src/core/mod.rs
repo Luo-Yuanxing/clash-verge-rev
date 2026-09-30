@@ -21,4 +21,4 @@ pub mod updater;
 pub mod validate;
 pub mod win_uwp;
 
-pub use self::{manager::CoreManager, timer::Timer, updater::SilentUpdater};
+pub use self::{manager::CoreManager, timer::Timer, updater::is_build_to_stable};
