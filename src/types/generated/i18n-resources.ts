@@ -696,6 +696,14 @@ export interface TranslationResources {
             saved: string
             savedForProfile: string
           }
+          migrate: {
+            action: string
+            feedback: {
+              duplicated: string
+              failed: string
+              migrated: string
+            }
+          }
           order: {
             byDomain: string
             original: string

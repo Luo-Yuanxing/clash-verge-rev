@@ -22,6 +22,14 @@
       "actions": {
         "save": "保存"
       },
+      "migrate": {
+        "action": "迁移",
+        "feedback": {
+          "migrated": "已复制 {{count}} 条规则到 {{name}}，跳过 {{skipped}} 条重复",
+          "duplicated": "{{name}} 中已存在全部规则，跳过了 {{skipped}} 条重复",
+          "failed": "复制失败，规则未写入"
+        }
+      },
       "feedback": {
         "saved": "规则已保存，内核已重启",
         "savedForProfile": "规则已保存到 {{name}}，切换到该订阅后生效"

@@ -1,5 +1,9 @@
-import { SaveRounded, SortRounded } from '@mui/icons-material'
-import { Box, Button, Chip, Typography } from '@mui/material'
+import {
+  ContentCopyRounded,
+  SaveRounded,
+  SortRounded,
+} from '@mui/icons-material'
+import { Box, Button, Chip, Menu, MenuItem, Typography } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -12,11 +16,14 @@ import {
 import {
   applyRuleEnabled,
   findFirstNonEmptyRulesUid,
+  readSeqRulesDocument,
   removeSeqRule,
   type SeqRulesConfig,
   serializeSeqRules,
+  toSeqConfig,
   updateSeqRule,
 } from '@/components/profile/seq-rules-document'
+import { migrateSeqRules } from '@/components/profile/seq-rules-migrate'
 import {
   type SeqRuleRow,
   type SeqRuleSource,
@@ -51,6 +58,8 @@ const CustomRulesPage = () => {
   const [visibility, setVisibility] = useState<SeqRuleVisibility>('all')
   /** 未保存改动的所属订阅：切换订阅后改动自动失效 */
   const [dirtyUid, setDirtyUid] = useState('')
+  /** 迁移目标订阅下拉菜单的锚点 */
+  const [migrateAnchor, setMigrateAnchor] = useState<HTMLElement | null>(null)
 
   useEffect(() => {
     void mutateProfiles()
@@ -258,6 +267,61 @@ const CustomRulesPage = () => {
     await saveDraft({ ...draft, excludeSubscriptionRules: next })
   })
 
+  /** 可迁移到的目标订阅：除当前编辑的订阅以外，所有配置了规则文件的订阅 */
+  const migrateTargets = items.filter((item) => item.uid !== selectedUid)
+
+  /**
+   * 把当前订阅的全部规则（含已关闭的）复制到目标订阅，
+   * 主机 / 规则类型 / 代理策略完全一样的规则直接跳过。
+   */
+  const handleMigrate = useLockFn(async (targetUid: string) => {
+    setMigrateAnchor(null)
+
+    const target = items.find((item) => item.uid === targetUid)
+    const property = target?.option?.rules
+    if (!property) return
+
+    const name = target?.name ?? targetUid
+
+    try {
+      const { config } = await readSeqRulesDocument(property)
+      const outcome = migrateSeqRules(toSeqConfig(config), rows)
+
+      if (outcome.copied === 0) {
+        showNotice.info(
+          t('rules.custom.page.migrate.feedback.duplicated', {
+            name,
+            skipped: outcome.skipped,
+          }),
+        )
+        return
+      }
+
+      const saved = await saveRulesFile(
+        property,
+        serializeSeqRules(outcome.config),
+      )
+
+      if (saved.status !== 'valid') {
+        showNotice.error(t('rules.custom.page.migrate.feedback.failed'))
+        return
+      }
+
+      // mihomo 的热重载不一定采用新规则，写回后显式重启内核
+      await restartCore()
+
+      showNotice.success(
+        t('rules.custom.page.migrate.feedback.migrated', {
+          count: outcome.copied,
+          skipped: outcome.skipped,
+          name,
+        }),
+      )
+    } catch (err: any) {
+      showNotice.error(err)
+    }
+  })
+
   return (
     <BasePage
       full
@@ -352,6 +416,16 @@ const CustomRulesPage = () => {
               </Button>
               <Button
                 size="small"
+                variant="outlined"
+                startIcon={<ContentCopyRounded />}
+                disabled={rows.length === 0 || migrateTargets.length === 0}
+                sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                onClick={(event) => setMigrateAnchor(event.currentTarget)}
+              >
+                {t('rules.custom.page.migrate.action')}
+              </Button>
+              <Button
+                size="small"
                 variant="contained"
                 disabled={!dirty}
                 startIcon={<SaveRounded />}
@@ -363,6 +437,23 @@ const CustomRulesPage = () => {
                 {t('rules.custom.page.actions.save')}
               </Button>
             </Box>
+            <Menu
+              anchorEl={migrateAnchor}
+              open={!!migrateAnchor}
+              onClose={() => setMigrateAnchor(null)}
+            >
+              {migrateTargets.map((item) => (
+                <MenuItem
+                  key={item.uid}
+                  selected={item.uid === current?.uid}
+                  onClick={() => {
+                    void handleMigrate(item.uid)
+                  }}
+                >
+                  {item.name ?? item.uid}
+                </MenuItem>
+              ))}
+            </Menu>
             <Box sx={{ height: 'calc(100% - 32px)', marginTop: '8px' }}>
               <SeqRulesTable
                 rows={filteredRows}

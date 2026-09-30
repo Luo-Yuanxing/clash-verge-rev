@@ -22,6 +22,14 @@
       "actions": {
         "save": "Save"
       },
+      "migrate": {
+        "action": "Migrate",
+        "feedback": {
+          "migrated": "Copied {{count}} rules to {{name}}; skipped {{skipped}} duplicates",
+          "duplicated": "{{name}} already has every rule; skipped {{skipped}} duplicates",
+          "failed": "Copy failed; no rule was written"
+        }
+      },
       "feedback": {
         "saved": "Rules saved; the core restarted",
         "savedForProfile": "Rules saved to {{name}}; they apply after switching to that profile"
