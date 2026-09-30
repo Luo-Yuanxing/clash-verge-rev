@@ -125,6 +125,7 @@ export const translationKeys = [
   'home.components.traffic.legends.download',
   'home.components.traffic.patterns.minutes',
   'home.components.traffic.unknownTime',
+  'home.components.traffic.resetTotals',
   'home.components.traffic.chartStyles.smooth',
   'home.components.traffic.chartStyles.linear',
   'home.components.traffic.diagnostics',

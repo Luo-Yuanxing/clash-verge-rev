@@ -201,6 +201,7 @@ export interface TranslationResources {
           patterns: {
             minutes: string
           }
+          resetTotals: string
           unknownTime: string
         }
       }

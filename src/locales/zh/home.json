@@ -131,6 +131,7 @@
         "minutes": "{{time}} 分钟"
       },
       "unknownTime": "未知时间",
+      "resetTotals": "点击清零上传量与下载量",
       "chartStyles": {
         "smooth": "平滑",
         "linear": "线性"
