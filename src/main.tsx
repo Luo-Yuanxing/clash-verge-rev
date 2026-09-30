@@ -9,6 +9,7 @@ import { SWRConfig } from 'swr'
 import { MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 import { BaseErrorBoundary } from './components/base'
+import { startConnectionLogScanning } from './hooks/use-connection-log'
 import { router } from './pages/_routers'
 import { preloadHomePageCards } from './pages/home'
 import { AppDataProvider } from './providers/app-data-provider'
@@ -66,6 +67,10 @@ const initializeApp = (initialThemeMode: 'light' | 'dark') => {
 }
 
 const bootstrap = async () => {
+  // The core log stream feeds the connection history list, so it is subscribed
+  // once for the whole app lifetime and never stops.
+  startConnectionLogScanning()
+
   const appDataPromise = preloadAppData()
   void preloadHomePageCards()
 

@@ -6,9 +6,14 @@ import { parseConnectionLogLine } from '@/utils/connection-log'
 import type { ConnectionHistoryItem } from './use-connection-data'
 
 const MAX_LOG_CONNECTIONS = 2_000
-const DEFAULT_REFRESH_MS = 5_000
+/** Log rescan period while the connections history list is on screen */
+const ACTIVE_REFRESH_MS = 5_000
+/** Log rescan period for the rest of the app lifetime */
+const IDLE_REFRESH_MS = 60_000
 const RECONNECT_DELAY_MS = 1_000
-const EMPTY_CONNECTIONS: ConnectionHistoryItem[] = []
+const MAX_RECONNECT_DELAY_MS = 30_000
+/** Safety net for a socket that dies without reporting an error */
+const KEEP_ALIVE_CHECK_MS = 30_000
 
 /**
  * Connection records parsed out of the core log stream.
@@ -19,8 +24,9 @@ const EMPTY_CONNECTIONS: ConnectionHistoryItem[] = []
 let records: ConnectionHistoryItem[] = []
 let socket: MihomoWebSocket | null = null
 let connecting = false
+let scanning = false
+let reconnectDelayMs = RECONNECT_DELAY_MS
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-let subscriberCount = 0
 
 const appendRecord = (record: ConnectionHistoryItem) => {
   records.push(record)
@@ -48,15 +54,16 @@ const closeSocket = async () => {
 }
 
 const scheduleReconnect = () => {
-  if (subscriberCount === 0 || reconnectTimer) return
+  if (!scanning || reconnectTimer) return
   reconnectTimer = window.setTimeout(() => {
     reconnectTimer = null
+    reconnectDelayMs = Math.min(reconnectDelayMs * 2, MAX_RECONNECT_DELAY_MS)
     void connect()
-  }, RECONNECT_DELAY_MS)
+  }, reconnectDelayMs)
 }
 
 const reconnect = async () => {
-  if (subscriberCount === 0) return
+  if (!scanning) return
   await closeSocket()
   scheduleReconnect()
 }
@@ -79,18 +86,19 @@ const handleMessage = (data: string) => {
 }
 
 const connect = async () => {
-  if (socket || connecting || subscriberCount === 0) return
+  if (socket || connecting || !scanning) return
 
   clearReconnectTimer()
   connecting = true
 
   try {
     const connected = await MihomoWebSocket.connect_logs('INFO')
-    if (subscriberCount === 0) {
+    if (!scanning) {
       await connected.close()
       return
     }
 
+    reconnectDelayMs = RECONNECT_DELAY_MS
     socket = connected
     connected.addListener((message) => {
       if (socket !== connected) return
@@ -104,17 +112,21 @@ const connect = async () => {
   }
 }
 
-const startSubscription = () => {
-  subscriberCount += 1
+/**
+ * Subscribe to the core log stream for the whole app lifetime.
+ *
+ * Scanning never stops: the subscription survives page switches and window
+ * hiding, and a keep-alive check reconnects a socket that went away silently.
+ */
+export const startConnectionLogScanning = () => {
+  if (scanning) return
+  scanning = true
   void connect()
-}
 
-const stopSubscription = () => {
-  subscriberCount = Math.max(0, subscriberCount - 1)
-  if (subscriberCount > 0) return
-
-  clearReconnectTimer()
-  void closeSocket()
+  window.setInterval(() => {
+    if (socket || connecting || reconnectTimer) return
+    void connect()
+  }, KEEP_ALIVE_CHECK_MS)
 }
 
 export const clearConnectionLogData = () => {
@@ -124,31 +136,25 @@ export const clearConnectionLogData = () => {
 /**
  * Connections seen in the core log within the last `durationMs`.
  *
- * Recomputed on a fixed interval instead of on every log line, and the log
- * subscription only lives while `enabled`. Active and closed lists are not
- * involved.
+ * Records are recomputed on a timer instead of on every log line: every 5s
+ * while the connections history list is on screen, every 60s otherwise.
  */
 export const useConnectionLogHistory = (
   durationMs: number,
-  options?: { enabled?: boolean; refreshMs?: number },
+  options?: { active?: boolean },
 ) => {
-  const enabled = options?.enabled ?? true
-  const refreshMs = options?.refreshMs ?? DEFAULT_REFRESH_MS
+  const active = options?.active ?? false
+  const refreshMs = active ? ACTIVE_REFRESH_MS : IDLE_REFRESH_MS
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    if (!enabled) return
-
-    startSubscription()
-    return stopSubscription
-  }, [enabled])
-
-  useEffect(() => {
-    if (!enabled) return
+    // Rescan on the first tick as well, so returning to the history list shows
+    // the newest records immediately instead of after a full idle period.
+    setNow(Date.now())
 
     const timer = window.setInterval(() => setNow(Date.now()), refreshMs)
     return () => window.clearInterval(timer)
-  }, [enabled, refreshMs])
+  }, [refreshMs])
 
   const clear = useCallback(() => {
     clearConnectionLogData()
@@ -156,11 +162,8 @@ export const useConnectionLogHistory = (
   }, [])
 
   const connections = useMemo(
-    () =>
-      enabled
-        ? records.filter((item) => item.startAt >= now - durationMs)
-        : EMPTY_CONNECTIONS,
-    [enabled, now, durationMs],
+    () => records.filter((item) => item.startAt >= now - durationMs),
+    [now, durationMs],
   )
 
   return { connections, clear }

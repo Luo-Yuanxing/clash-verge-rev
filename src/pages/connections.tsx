@@ -150,10 +150,10 @@ const ConnectionsPage = () => {
   /** 默认隐藏主机已被自定义规则覆盖的记录 */
   const hideCovered = setting.hideCoveredHosts ?? true
 
-  /** 历史列表的数据源是内核日志事件流，仅在该界面打开时订阅并按固定周期刷新 */
+  /** 历史列表的数据源是内核日志事件流：日志订阅常驻，列表打开时 5s 重算一次，否则 60s */
   const { connections: rangeConnections, clear: clearRangeConnections } =
     useConnectionLogHistory(historyWindowMs, {
-      enabled: pageVisible && connectionsType === 'history',
+      active: pageVisible && connectionsType === 'history',
     })
 
   useEffect(() => {
