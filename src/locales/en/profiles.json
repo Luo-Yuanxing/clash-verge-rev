@@ -38,8 +38,7 @@
       "feedback": {
         "exported": "Generated and copied to clipboard",
         "imported": "Import finished, new profile: {{name}}",
-        "importedBackup": "Settings imported; rules attached to {{count}} profiles",
-        "importedSettingsOnly": "Settings imported (the config carried no custom rules)",
+        "importedBackup": "Settings imported and an empty profile created: {{name}}",
         "badFormat": "Invalid string format: not a valid Base64 or backup payload",
         "badJson": "Invalid string format: the content is not valid JSON",
         "badType": "Type mismatch: not a quick config exported by this app",

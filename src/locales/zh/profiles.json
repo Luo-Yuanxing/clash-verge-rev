@@ -38,8 +38,7 @@
       "feedback": {
         "exported": "已生成并复制到剪贴板",
         "imported": "导入完成，新订阅：{{name}}",
-        "importedBackup": "设置已导入，并为 {{count}} 个订阅挂上规则",
-        "importedSettingsOnly": "设置已导入（配置里没有自定义规则）",
+        "importedBackup": "设置已导入，并新建空订阅：{{name}}",
         "badFormat": "字符串格式错误：内容不是有效的 Base64 或备份载荷",
         "badJson": "字符串格式错误：内容不是合法的 JSON",
         "badType": "类型不匹配：不是本应用导出的快捷配置",

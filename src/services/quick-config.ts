@@ -47,12 +47,10 @@ export interface RuledBackupPayload {
 }
 
 export interface QuickConfigImportResult {
-  /** 新建订阅名，没有自定义规则时为 null */
+  /** 新建订阅名，载荷里没有规则时为 null */
   name: string | null
-  /** 导入的备份文件名，备份载荷导入失败时为 null */
+  /** 恢复设置用的备份文件名，非备份载荷时为 null */
   backupFile: string | null
-  /** 挂上规则的订阅数 */
-  rulesApplied: number
 }
 
 export type QuickConfigErrorCode =
@@ -292,43 +290,23 @@ const uniqueBackupFileName = (existing: Set<string>): string => {
   return name
 }
 
-/** 规则内容是否为空：`prepend`/`append`/`delete`/`rules` 全空视为没有规则 */
-const hasRuleContent = (content: string): boolean => {
-  const parsed = parseYamlSafe(content)
-  if (!parsed || typeof parsed !== 'object') return false
-
-  return Object.values(parsed as Record<string, unknown>).some((value) =>
-    Array.isArray(value) ? value.length > 0 : !!value,
-  )
-}
-
-/** 把规则挂到新建的本地订阅上，返回订阅名；订阅创建失败时返回 null */
-const createRuleProfile = async (
-  name: string,
-  content: string,
-): Promise<string | null> => {
+/** 新建一个空订阅，名字重名时在末尾补 `*`，返回最终订阅名 */
+const createEmptyProfile = async (nameBase: string): Promise<string> => {
   const profiles = await getProfiles()
-  const uniqueName = uniqueProfileName(profiles.items ?? [], name)
+  const name = uniqueProfileName(profiles.items ?? [], nameBase)
 
   try {
-    await createProfile({ type: 'local', name: uniqueName, desc: '' })
+    await createProfile({ type: 'local', name, desc: '' })
   } catch {
-    return null
+    throw new QuickConfigError('profile')
   }
 
-  const created = (await getProfiles()).items?.find(
-    (item) => item?.name === uniqueName,
-  )
-  const rulesUid = created?.option?.rules
-  if (!rulesUid) return null
-
-  const outcome = await saveRulesFile(rulesUid, content)
-  return outcome.status === 'valid' ? uniqueName : null
+  return name
 }
 
 /**
- * 导入配置：`cv1:` 备份载荷解出「设置 + 规则」——设置落到本地备份目录（复用原有导入函数），
- * 规则挂到新建的订阅上；旧的 JSON 快捷配置则只带一份规则。
+ * 导入配置：`cv1:` 备份载荷恢复设置，再新建一个空订阅——载荷里的规则字符串不导入，
+ * 订阅名统一取载荷前八位；旧的 JSON 快捷配置则把自带的一份规则挂到新建的空订阅上。
  * `scope` 为界面当前选中的范围，载荷范围与之不符时直接拒绝。
  */
 export const importQuickConfig = async (
@@ -337,6 +315,8 @@ export const importQuickConfig = async (
 ): Promise<QuickConfigImportResult> => {
   const text = raw.trim()
   if (!text) throw new QuickConfigError('format')
+
+  const nameBase = text.slice(0, QUICK_CONFIG_NAME_LENGTH)
 
   if (text.startsWith(QUICK_CONFIG_PREFIX)) {
     if (scope !== 'all') throw new QuickConfigError('scope')
@@ -356,17 +336,7 @@ export const importQuickConfig = async (
       throw new QuickConfigError('restore')
     }
 
-    let rulesApplied = 0
-    let firstName: string | null = null
-    for (const entry of payload.rules) {
-      if (!hasRuleContent(entry.content)) continue
-      const created = await createRuleProfile(entry.name, entry.content)
-      if (!created) continue
-      rulesApplied += 1
-      firstName ??= created
-    }
-
-    return { name: firstName, backupFile, rulesApplied }
+    return { name: await createEmptyProfile(nameBase), backupFile }
   }
 
   const payload = parseQuickConfig(text)
@@ -374,19 +344,10 @@ export const importQuickConfig = async (
 
   const customRule = payload['custom-rule']
   if (!customRule || typeof customRule !== 'object') {
-    return { name: null, backupFile: null, rulesApplied: 0 }
+    return { name: null, backupFile: null }
   }
 
-  const nameBase = text.slice(0, QUICK_CONFIG_NAME_LENGTH)
-  const profiles = await getProfiles()
-  const name = uniqueProfileName(profiles.items ?? [], nameBase)
-
-  try {
-    await createProfile({ type: 'local', name, desc: '' })
-  } catch {
-    throw new QuickConfigError('profile')
-  }
-
+  const name = await createEmptyProfile(nameBase)
   const created = (await getProfiles()).items?.find(
     (item) => item?.name === name,
   )
@@ -399,5 +360,5 @@ export const importQuickConfig = async (
   )
   if (outcome.status !== 'valid') throw new QuickConfigError('rules')
 
-  return { name, backupFile: null, rulesApplied: 1 }
+  return { name, backupFile: null }
 }

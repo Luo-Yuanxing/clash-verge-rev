@@ -207,7 +207,6 @@ export const translationKeys = [
   'profiles.page.quickConfig.feedback.exported',
   'profiles.page.quickConfig.feedback.imported',
   'profiles.page.quickConfig.feedback.importedBackup',
-  'profiles.page.quickConfig.feedback.importedSettingsOnly',
   'profiles.page.quickConfig.feedback.badFormat',
   'profiles.page.quickConfig.feedback.badJson',
   'profiles.page.quickConfig.feedback.badType',
