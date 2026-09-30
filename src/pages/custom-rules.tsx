@@ -26,7 +26,7 @@ import {
 import { useSeqRuleConfig } from '@/components/profile/use-seq-rule-config'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVisibility } from '@/hooks/use-visibility'
-import { restartCore, saveProfileFile } from '@/services/cmds'
+import { saveRulesFile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
 const CustomRulesPage = () => {
@@ -109,6 +109,10 @@ const CustomRulesPage = () => {
 
   const rulesProperty = selected?.option?.rules
 
+  /** 编辑的是当前订阅的规则文件：后端保存时会顺带更新运行时，内核即已采用 */
+  const isCurrentRules =
+    !!rulesProperty && rulesProperty === current?.option?.rules
+
   /** 文件里保存为启用的规则，未保存的勾选不会改变它 */
   const savedEnabledKeys = useMemo(
     () =>
@@ -179,16 +183,29 @@ const CustomRulesPage = () => {
     if (!rulesProperty) return false
 
     try {
-      if (!(await saveProfileFile(rulesProperty, serializeSeqRules(next)))) {
-        return false
-      }
+      const outcome = await saveRulesFile(
+        rulesProperty,
+        serializeSeqRules(next),
+      )
+
+      if (outcome.status === 'invalid') return false
 
       applyDraft(next)
       setSavedSeq(next)
       setDirtyUid('')
 
-      // 规则已写盘，但只有重启内核后才会被采用
-      await restartCore().catch((err) => showNotice.error(err))
+      if (outcome.status === 'busy') {
+        showNotice.warning(t('rules.custom.page.feedback.pending'))
+      } else {
+        showNotice.success(
+          t(
+            isCurrentRules
+              ? 'rules.custom.page.feedback.saved'
+              : 'rules.custom.page.feedback.savedForProfile',
+            { name: selected?.name ?? selectedUid },
+          ),
+        )
+      }
 
       return true
     } catch (err: any) {
