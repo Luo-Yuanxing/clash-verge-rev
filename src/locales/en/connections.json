@@ -31,16 +31,16 @@
       "createRule": "Create rules"
     },
     "history": {
-      "window": "{{count}} min",
-      "excludeIp": "Exclude IP"
+      "window": "{{count}} min"
+    },
+    "filters": {
+      "title": "Filters",
+      "excludeIp": "Exclude IP connections",
+      "hideCovered": "Hide hosts covered by custom rules"
     },
     "chains": {
       "all": "All chains",
       "filter": "Filter by chain"
-    },
-    "covered": {
-      "show": "Show hosts covered by custom rules",
-      "hide": "Hide hosts covered by custom rules"
     },
     "columnManager": {
       "title": "Columns",

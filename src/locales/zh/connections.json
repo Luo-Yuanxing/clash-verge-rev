@@ -31,16 +31,16 @@
       "createRule": "创建规则"
     },
     "history": {
-      "window": "{{count}} 分钟",
-      "excludeIp": "排除 IP 连接"
+      "window": "{{count}} 分钟"
+    },
+    "filters": {
+      "title": "筛选",
+      "excludeIp": "排除 IP 连接",
+      "hideCovered": "隐藏已被自定义规则覆盖的主机"
     },
     "chains": {
       "all": "全部链路",
       "filter": "按链路筛选"
-    },
-    "covered": {
-      "show": "显示已被自定义规则覆盖的主机",
-      "hide": "隐藏已被自定义规则覆盖的主机"
     },
     "columnManager": {
       "title": "列设置",

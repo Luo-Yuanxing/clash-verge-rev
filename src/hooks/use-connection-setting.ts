@@ -14,6 +14,7 @@ const defaultConnectionSetting: IConnectionSetting = {
   layout: 'table',
   historyWindowMs: DEFAULT_HISTORY_WINDOW_MS,
   excludeIpConnections: true,
+  hideCoveredHosts: true,
 }
 
 export const useConnectionSetting = () =>

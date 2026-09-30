@@ -1,6 +1,5 @@
 import {
   DeleteForeverRounded,
-  FilterAltOffRounded,
   FilterAltRounded,
   PauseRounded,
   PlayArrowRounded,
@@ -13,9 +12,7 @@ import {
   Box,
   Button,
   ButtonGroup,
-  Checkbox,
   Fab,
-  FormControlLabel,
   IconButton,
   MenuItem,
   Tooltip,
@@ -38,6 +35,7 @@ import {
   ConnectionDetail,
   ConnectionDetailRef,
 } from '@/components/connection/connection-detail'
+import { ConnectionFilterDialog } from '@/components/connection/connection-filter-dialog'
 import { mergeHistoryConnections } from '@/components/connection/connection-history-merge'
 import { ConnectionRowItem } from '@/components/connection/connection-row-item'
 import {
@@ -121,8 +119,6 @@ const ConnectionsPage = () => {
     useState<ConnectionsType>('active')
   /** 按链路筛选，空串表示全部链路 */
   const [curChain, setCurChain] = useState('')
-  /** 历史列表默认隐藏已被自定义规则覆盖的主机 */
-  const [hideCovered, setHideCovered] = useState(true)
 
   const {
     response: { data: connections },
@@ -140,6 +136,8 @@ const ConnectionsPage = () => {
   const historyWindowMs = setting.historyWindowMs ?? DEFAULT_HISTORY_WINDOW_MS
   /** 默认排除裸 IP 的历史记录 */
   const excludeIpConnections = setting.excludeIpConnections ?? true
+  /** 默认隐藏主机已被自定义规则覆盖的记录 */
+  const hideCovered = setting.hideCoveredHosts ?? true
 
   useEffect(() => {
     setConnectionHistoryWindow(historyWindowMs)
@@ -153,6 +151,7 @@ const ConnectionsPage = () => {
 
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
   const [isRuleDialogOpen, setIsRuleDialogOpen] = useState(false)
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false)
   const [paused, setPaused] = useState(false)
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -476,52 +475,17 @@ const ConnectionsPage = () => {
           </BaseStyledSelect>
         )}
         {connectionsType === 'history' && (
-          <FormControlLabel
-            sx={{ mr: 0.5, flex: '0 0 auto', whiteSpace: 'nowrap' }}
-            control={
-              <Checkbox
-                size="small"
-                checked={excludeIpConnections}
-                onChange={(e) =>
-                  setSetting((o) => ({
-                    layout: o?.layout ?? 'table',
-                    ...o,
-                    excludeIpConnections: e.target.checked,
-                  }))
-                }
-              />
-            }
-            label={
-              <span style={{ fontSize: 13 }}>
-                {t('connections.components.history.excludeIp')}
-              </span>
-            }
-          />
-        )}
-        {connectionsType === 'history' && (
-          <Tooltip
-            title={t(
-              hideCovered
-                ? 'connections.components.covered.show'
-                : 'connections.components.covered.hide',
-            )}
-          >
+          <Tooltip title={t('connections.components.filters.title')}>
             <IconButton
               size="small"
-              color={hideCovered ? 'primary' : 'inherit'}
-              aria-label={t(
-                hideCovered
-                  ? 'connections.components.covered.show'
-                  : 'connections.components.covered.hide',
-              )}
-              onClick={() => setHideCovered((value) => !value)}
-              sx={{ flex: '0 0 auto' }}
+              color={
+                excludeIpConnections || hideCovered ? 'primary' : 'inherit'
+              }
+              aria-label={t('connections.components.filters.title')}
+              onClick={() => setIsFilterDialogOpen(true)}
+              sx={{ flex: '0 0 auto', mr: 1 }}
             >
-              {hideCovered ? (
-                <FilterAltRounded fontSize="small" />
-              ) : (
-                <FilterAltOffRounded fontSize="small" />
-              )}
+              <FilterAltRounded fontSize="small" />
             </IconButton>
           </Tooltip>
         )}
@@ -692,6 +656,19 @@ const ConnectionsPage = () => {
           {t('shared.actions.clear')}
         </Fab>
       </Zoom>
+      <ConnectionFilterDialog
+        open={isFilterDialogOpen}
+        filters={{ excludeIp: excludeIpConnections, hideCovered }}
+        onClose={() => setIsFilterDialogOpen(false)}
+        onApply={({ excludeIp, hideCovered: nextHideCovered }) =>
+          setSetting((o) => ({
+            layout: o?.layout ?? 'table',
+            ...o,
+            excludeIpConnections: excludeIp,
+            hideCoveredHosts: nextHideCovered,
+          }))
+        }
+      />
     </BasePage>
   )
 }

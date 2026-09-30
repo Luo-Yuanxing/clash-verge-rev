@@ -209,6 +209,8 @@ interface IConnectionSetting {
   historyWindowMs?: number
   /** Hide history rows whose target is a bare IP address */
   excludeIpConnections?: boolean
+  /** Hide rows whose host is already covered by the custom rules */
+  hideCoveredHosts?: boolean
 }
 
 interface IClashInfo {

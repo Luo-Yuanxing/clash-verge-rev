@@ -22,10 +22,6 @@ export interface TranslationResources {
           dragHandle: string
           title: string
         }
-        covered: {
-          hide: string
-          show: string
-        }
         fields: {
           chains: string
           destination: string
@@ -39,8 +35,12 @@ export interface TranslationResources {
           type: string
           ulSpeed: string
         }
-        history: {
+        filters: {
           excludeIp: string
+          hideCovered: string
+          title: string
+        }
+        history: {
           window: string
         }
         order: {
