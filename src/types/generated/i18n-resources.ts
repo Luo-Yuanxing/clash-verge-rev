@@ -40,7 +40,8 @@ export interface TranslationResources {
           title: string
         }
         history: {
-          window: string
+          rangeMinutes: string
+          rangeSeconds: string
         }
         order: {
           default: string

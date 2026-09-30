@@ -52,6 +52,7 @@ import {
   pruneConnectionHistory,
   setConnectionHistoryWindow,
   useConnectionData,
+  useConnectionHistoryInRange,
 } from '@/hooks/use-connection-data'
 import {
   HISTORY_WINDOW_OPTIONS,
@@ -149,6 +150,11 @@ const ConnectionsPage = () => {
   /** 默认隐藏主机已被自定义规则覆盖的记录 */
   const hideCovered = setting.hideCoveredHosts ?? true
 
+  /** 仅在该界面打开时按固定周期刷新，关闭后停止 */
+  const rangeConnections = useConnectionHistoryInRange(historyWindowMs, {
+    enabled: pageVisible && connectionsType === 'history',
+  })
+
   useEffect(() => {
     setConnectionHistoryWindow(historyWindowMs)
   }, [historyWindowMs])
@@ -177,15 +183,16 @@ const ConnectionsPage = () => {
     historyConnections: [],
   })
 
-  /** 历史列表：可选排除裸 IP 记录，再按主机压缩（连接时间取最近、流量累加） */
-  const historyConnections = useMemo(() => {
-    const source = connections?.historyConnections ?? EMPTY_CONNECTIONS
-    return mergeHistoryConnections(
-      excludeIpConnections
-        ? source.filter((connection) => !isIpConnection(connection))
-        : source,
-    )
-  }, [connections, excludeIpConnections])
+  /** 历史列表：指定时长内出现过的连接，可选排除裸 IP，再按主机压缩 */
+  const historyConnections = useMemo(
+    () =>
+      mergeHistoryConnections(
+        excludeIpConnections
+          ? rangeConnections.filter((connection) => !isIpConnection(connection))
+          : rangeConnections,
+      ),
+    [rangeConnections, excludeIpConnections],
+  )
 
   const togglePause = useCallback(() => {
     if (!paused) {
@@ -518,9 +525,13 @@ const ConnectionsPage = () => {
             {HISTORY_WINDOW_OPTIONS.map((windowMs) => (
               <MenuItem key={windowMs} value={windowMs}>
                 <span style={{ fontSize: 14 }}>
-                  {t('connections.components.history.window', {
-                    count: windowMs / 60_000,
-                  })}
+                  {windowMs < 60_000
+                    ? t('connections.components.history.rangeSeconds', {
+                        count: windowMs / 1_000,
+                      })
+                    : t('connections.components.history.rangeMinutes', {
+                        count: windowMs / 60_000,
+                      })}
                 </span>
               </MenuItem>
             ))}

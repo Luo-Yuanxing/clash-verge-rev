@@ -1,4 +1,10 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 const MAX_CLOSED_CONNS_NUM = 500
@@ -8,7 +14,7 @@ const CONNECTION_UPDATE_THROTTLE_MS = 500
 const CONNECTION_RECONNECT_DELAY_MS = 1_000
 
 export const DEFAULT_HISTORY_WINDOW_MS = 10 * 60 * 1_000
-const MIN_HISTORY_WINDOW_MS = 60 * 1_000
+const MIN_HISTORY_WINDOW_MS = 5_000
 
 export interface ConnectionHistoryItem extends IConnectionsItem {
   /** Connection start time, parsed from the core-provided start field */
@@ -547,6 +553,40 @@ const subscribeConnectionSummary = (listener: ConnectionListener) => {
     summaryListeners.delete(listener)
     summarySupervisor.stopIfIdle()
   }
+}
+
+const DEFAULT_RANGE_REFRESH_MS = 5_000
+const EMPTY_CONNECTION_LIST: ConnectionHistoryItem[] = []
+
+/**
+ * Connections that were alive at any point within the last `durationMs`.
+ *
+ * The range is recomputed on a fixed interval instead of on every snapshot, so
+ * the history view stays cheap; leaving the page stops the timer. The active
+ * and closed lists are left untouched.
+ */
+export const useConnectionHistoryInRange = (
+  durationMs: number,
+  options?: { enabled?: boolean; refreshMs?: number },
+) => {
+  const enabled = options?.enabled ?? true
+  const refreshMs = options?.refreshMs ?? DEFAULT_RANGE_REFRESH_MS
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!enabled) return
+
+    const timer = window.setInterval(() => setNow(Date.now()), refreshMs)
+    return () => window.clearInterval(timer)
+  }, [enabled, refreshMs])
+
+  return useMemo(
+    () =>
+      enabled
+        ? getConnectionsInRange(now - durationMs, now)
+        : EMPTY_CONNECTION_LIST,
+    [enabled, now, durationMs],
+  )
 }
 
 const clearClosedConnectionData = () => {

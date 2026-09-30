@@ -3,6 +3,9 @@ import { useLocalStorage } from 'foxact/use-local-storage'
 import { DEFAULT_HISTORY_WINDOW_MS } from './use-connection-data'
 
 export const HISTORY_WINDOW_OPTIONS = [
+  5 * 1_000,
+  15 * 1_000,
+  30 * 1_000,
   60 * 1_000,
   5 * 60 * 1_000,
   10 * 60 * 1_000,

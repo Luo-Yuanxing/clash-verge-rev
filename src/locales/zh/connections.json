@@ -37,7 +37,8 @@
       "error": "{{seconds}} 秒内未收到响应，可能无法连接或被阻断"
     },
     "history": {
-      "window": "{{count}} 分钟"
+      "rangeSeconds": "近 {{count}} 秒",
+      "rangeMinutes": "近 {{count}} 分钟"
     },
     "filters": {
       "title": "筛选",

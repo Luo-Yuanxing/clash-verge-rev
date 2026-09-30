@@ -37,7 +37,8 @@
       "error": "No response within {{seconds}}s: unreachable or blocked"
     },
     "history": {
-      "window": "{{count}} min"
+      "rangeSeconds": "Last {{count}}s",
+      "rangeMinutes": "Last {{count}}min"
     },
     "filters": {
       "title": "Filters",
