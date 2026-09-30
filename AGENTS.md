@@ -64,4 +64,5 @@ pnpm typecheck && pnpm lint && pnpm format:check && pnpm test
 
 ## 补充说明
 
-尽可能的不要**编译**等耗时操作,用户会自行检查
+- 尽可能的不要**编译**等耗时操作,用户会自行检查
+- CRLF和LF以后不要处理
