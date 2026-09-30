@@ -81,17 +81,17 @@ const decodeBase64 = (base64: string): string => {
   return new TextDecoder().decode(bytes)
 }
 
-/** 校验并规范化备份载荷：只接受 `cv1:` 压缩格式，非法字符判为无效 */
-const checkedBackupBody = (text: string): string => {
+/** 校验备份载荷：只接受 `cv1:` 压缩格式，非法字符判为无效；原样返回，前缀必须保留 */
+const checkedBackupText = (text: string): string => {
   if (!text.startsWith(QUICK_CONFIG_PREFIX)) {
     throw new QuickConfigError('invalid')
   }
 
-  const body = text.slice(QUICK_CONFIG_PREFIX.length).replace(/\s+/gu, '')
+  const body = text.slice(QUICK_CONFIG_PREFIX.length)
   if (!body || !/^[A-Za-z0-9+/]+={0,2}$/u.test(body)) {
     throw new QuickConfigError('invalid')
   }
-  return body
+  return text
 }
 
 /** 导出载荷里规则段的标记；缺失时视为只有设置 */
@@ -117,7 +117,7 @@ const checkedRules = (value: unknown): RuledBackupPayload['rules'] => {
 /** 从「设置 + 规则」文案里解出两部分，规则段缺失时为没有规则 */
 const parseRuledBackupText = (text: string): RuledBackupPayload => {
   const [settingsLine = '', ...rest] = text.split('\n')
-  const settings = checkedBackupBody(settingsLine.replace(/\s+/gu, ''))
+  const settings = checkedBackupText(settingsLine.replace(/\s+/gu, ''))
 
   const ruleLine = rest.join('').trim()
   if (!ruleLine) return { settings, rules: [] }
@@ -174,7 +174,7 @@ const exportBackupPayload = async (): Promise<RuledBackupPayload> => {
   }
 
   return {
-    settings: checkedBackupBody(payload.settings.replace(/\s+/gu, '')),
+    settings: checkedBackupText(payload.settings.replace(/\s+/gu, '')),
     rules: checkedRules(payload.rules),
   }
 }
