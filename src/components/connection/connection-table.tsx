@@ -433,6 +433,7 @@ export const ConnectionTable = (props: Props) => {
         headerName: t('connections.components.fields.host'),
         width: 180,
         minWidth: 140,
+        autoWidth: true,
       },
       {
         field: 'download',
@@ -469,9 +470,9 @@ export const ConnectionTable = (props: Props) => {
       {
         field: 'chains',
         headerName: t('connections.components.fields.chains'),
-        width: 84,
-        minWidth: 72,
-        maxWidth: 84,
+        width: 56,
+        minWidth: 48,
+        maxWidth: 56,
       },
       {
         field: 'rule',
