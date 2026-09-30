@@ -44,22 +44,15 @@ export async function saveProfileFile(index: string, fileData: string) {
 }
 
 /**
- * 保存配置文件并区分失败原因：
- * `busy` 表示后端写入成功但运行时配置没更新（那次配置更新被占用），此处补一次同步；
+ * 保存配置文件，返回后端的完整结果：
+ * `busy` 只代表这次配置更新被别的操作占用，文件状态以后端回滚结果为准；
  * `invalid` 表示校验失败，后端已回滚文件并给出提示。
  */
 export async function saveRulesFile(
   index: string,
   fileData: string,
 ): Promise<ValidationOutcome> {
-  const outcome = await invoke<ValidationOutcome>('save_profile_file', {
-    index,
-    fileData,
-  })
-  if (outcome.status !== 'busy') return outcome
-
-  const retry = await invoke<ValidationOutcome>('enhance_profiles')
-  return retry.status === 'valid' ? { status: 'valid' } : outcome
+  return invoke<ValidationOutcome>('save_profile_file', { index, fileData })
 }
 
 export async function importProfile(url: string, option?: IProfileOption) {
