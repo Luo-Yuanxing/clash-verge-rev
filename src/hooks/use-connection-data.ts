@@ -11,7 +11,9 @@ export const DEFAULT_HISTORY_WINDOW_MS = 10 * 60 * 1_000
 const MIN_HISTORY_WINDOW_MS = 60 * 1_000
 
 export interface ConnectionHistoryItem extends IConnectionsItem {
-  /** Timestamp of the last snapshot the connection was seen in */
+  /** Connection start time, parsed from the core-provided start field */
+  startAt: number
+  /** Last snapshot the connection was observed in, i.e. the end of its closed interval */
   lastSeen: number
   active: boolean
 }
@@ -221,6 +223,10 @@ const mergeConnectionSnapshot = (
 
 let historyWindowMs = DEFAULT_HISTORY_WINDOW_MS
 
+/** Connection start time reported by the core, `fallback` when it cannot be parsed */
+const connectionStartAt = (connection: IConnectionsItem, fallback: number) =>
+  Date.parse(connection.start || '') || fallback
+
 /**
  * Append the latest snapshot to the rolling history window.
  * Active connections are refreshed in place, disappeared ones keep their
@@ -247,7 +253,12 @@ const mergeConnectionHistory = (
     const active = activeById.get(item.id)
     if (active) {
       recorded.add(item.id)
-      nextHistory.push({ ...active, lastSeen: now, active: true })
+      nextHistory.push({
+        ...active,
+        startAt: connectionStartAt(active, item.startAt),
+        lastSeen: now,
+        active: true,
+      })
       continue
     }
 
@@ -262,7 +273,12 @@ const mergeConnectionHistory = (
     const connection = activeConnections[i]
     if (recorded.has(connection.id)) continue
     recorded.add(connection.id)
-    nextHistory.push({ ...connection, lastSeen: now, active: true })
+    nextHistory.push({
+      ...connection,
+      startAt: connectionStartAt(connection, now),
+      lastSeen: now,
+      active: true,
+    })
   }
 
   if (nextHistory.length <= MAX_HISTORY_CONNS_NUM) return nextHistory
@@ -299,6 +315,27 @@ export const clearConnectionHistoryData = () => {
   if (connectionData.historyConnections.length === 0) return
   connectionData = { ...connectionData, historyConnections: [] }
   notifyConnectionListeners()
+}
+
+/**
+ * Connections whose lifetime interval overlaps `[from, to]`.
+ *
+ * A connection is treated as continuous from `startAt` (the start time
+ * reported by the core) until `lastSeen`; connections that are still alive
+ * have no end and therefore always overlap. Results are limited to what the
+ * history window still holds.
+ */
+export const getConnectionsInRange = (
+  from: number,
+  to: number = Date.now(),
+): ConnectionHistoryItem[] => {
+  const rangeStart = Math.min(from, to)
+  const rangeEnd = Math.max(from, to)
+
+  return connectionData.historyConnections.filter((item) => {
+    if (item.startAt > rangeEnd) return false
+    return item.active || item.lastSeen >= rangeStart
+  })
 }
 
 const mergeConnectionSummary = (

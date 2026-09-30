@@ -33,6 +33,7 @@ export const mergeHistoryConnection = (
     curDownload:
       (left.active ? (left.curDownload ?? 0) : 0) +
       (right.active ? (right.curDownload ?? 0) : 0),
+    startAt: Math.min(left.startAt, right.startAt),
     lastSeen: Math.max(left.lastSeen, right.lastSeen),
     active: left.active || right.active,
   }

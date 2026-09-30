@@ -30,6 +30,7 @@ const connection = (
   rulePayload: '',
   curUpload: 0,
   curDownload: 0,
+  startAt: 0,
   lastSeen: 0,
   active: false,
   ...options,
