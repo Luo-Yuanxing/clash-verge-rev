@@ -135,7 +135,6 @@ const ConnectionsPage = () => {
 
   const {
     response: { data: connections },
-    clearClosedConnections,
     clearHistoryConnections,
   } = useConnectionData({ enabled: pageVisible })
   const { data: traffic } = useTrafficData({ enabled: pageVisible })
@@ -732,10 +731,7 @@ const ConnectionsPage = () => {
         onCreated={() => setSelectedIds(new Set())}
       />
       <Zoom
-        in={
-          (connectionsType === 'closed' || connectionsType === 'history') &&
-          filterConn.length > 0
-        }
+        in={connectionsType === 'history' && filterConn.length > 0}
         unmountOnExit
       >
         <Fab
@@ -748,12 +744,8 @@ const ConnectionsPage = () => {
           }}
           color="primary"
           onClick={() => {
-            if (connectionsType === 'history') {
-              clearRangeConnections()
-              clearHistoryConnections()
-              return
-            }
-            clearClosedConnections()
+            clearRangeConnections()
+            clearHistoryConnections()
           }}
         >
           <DeleteForeverRounded sx={{ mr: 1 }} fontSize="small" />
