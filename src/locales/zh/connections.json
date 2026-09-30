@@ -71,9 +71,8 @@
         "saveFailed": "规则保存失败"
       },
       "notifications": {
-        "created": "已创建 {{count}} 条规则，内核已重新加载配置",
+        "created": "已创建 {{count}} 条规则，内核已重启",
         "createdForProfile": "已创建 {{count}} 条规则到 {{name}}，切换到该订阅后生效",
-        "pending": "规则已保存，但配置更新被占用，请稍后重试",
         "duplicated": "选中的连接对应的规则均已存在"
       }
     }

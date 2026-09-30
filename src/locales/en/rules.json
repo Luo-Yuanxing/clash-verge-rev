@@ -23,9 +23,8 @@
         "save": "Save"
       },
       "feedback": {
-        "saved": "Rules saved; the core reloaded the configuration",
-        "savedForProfile": "Rules saved to {{name}}; they apply after switching to that profile",
-        "pending": "Rules saved, but a configuration update is already running; retry shortly"
+        "saved": "Rules saved; the core restarted",
+        "savedForProfile": "Rules saved to {{name}}; they apply after switching to that profile"
       },
       "order": {
         "byDomain": "Sort by domain level",

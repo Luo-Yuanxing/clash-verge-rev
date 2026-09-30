@@ -69,7 +69,6 @@ export interface TranslationResources {
             created: string
             createdForProfile: string
             duplicated: string
-            pending: string
           }
           policies: {
             PROXY: string
@@ -673,7 +672,6 @@ export interface TranslationResources {
             label: string
           }
           feedback: {
-            pending: string
             saved: string
             savedForProfile: string
           }

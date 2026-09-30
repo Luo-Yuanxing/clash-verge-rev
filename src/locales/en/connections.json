@@ -71,9 +71,8 @@
         "saveFailed": "Failed to save rules"
       },
       "notifications": {
-        "created": "Created {{count}} rule(s); the core reloaded the configuration",
+        "created": "Created {{count}} rule(s); the core restarted",
         "createdForProfile": "Created {{count}} rule(s) in {{name}}; they apply after switching to that profile",
-        "pending": "Rules saved, but a configuration update is already running; retry shortly",
         "duplicated": "All selected rules already exist"
       }
     }

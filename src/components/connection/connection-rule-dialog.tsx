@@ -27,7 +27,7 @@ import {
   toSeqConfig,
 } from '@/components/profile/seq-rules-document'
 import { useProfiles } from '@/hooks/use-profiles'
-import { saveRulesFile } from '@/services/cmds'
+import { restartCore, saveRulesFile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
 const RULE_TYPES = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD'] as const
@@ -211,18 +211,17 @@ export const ConnectionRuleDialog = (props: Props) => {
         }),
       )
 
-      if (outcome.status === 'invalid') {
+      if (outcome.status !== 'valid') {
         showNotice.error(
           t('connections.components.ruleDialog.errors.saveFailed'),
         )
         return
       }
 
-      if (outcome.status === 'busy') {
-        showNotice.warning(
-          t('connections.components.ruleDialog.notifications.pending'),
-        )
-      } else if (rulesProperty === current?.option?.rules) {
+      // mihomo 的热重载不一定采用新规则，创建后显式重启内核
+      await restartCore()
+
+      if (rulesProperty === current?.option?.rules) {
         showNotice.success(
           t('connections.components.ruleDialog.notifications.created', {
             count: created.length,

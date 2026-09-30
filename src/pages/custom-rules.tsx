@@ -26,7 +26,7 @@ import {
 import { useSeqRuleConfig } from '@/components/profile/use-seq-rule-config'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVisibility } from '@/hooks/use-visibility'
-import { saveRulesFile } from '@/services/cmds'
+import { restartCore, saveRulesFile } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
 const CustomRulesPage = () => {
@@ -188,24 +188,23 @@ const CustomRulesPage = () => {
         serializeSeqRules(next),
       )
 
-      if (outcome.status === 'invalid') return false
+      if (outcome.status !== 'valid') return false
+
+      // mihomo 的热重载不一定采用新规则，保存后显式重启内核
+      await restartCore()
 
       applyDraft(next)
       setSavedSeq(next)
       setDirtyUid('')
 
-      if (outcome.status === 'busy') {
-        showNotice.warning(t('rules.custom.page.feedback.pending'))
-      } else {
-        showNotice.success(
-          t(
-            isCurrentRules
-              ? 'rules.custom.page.feedback.saved'
-              : 'rules.custom.page.feedback.savedForProfile',
-            { name: selected?.name ?? selectedUid },
-          ),
-        )
-      }
+      showNotice.success(
+        t(
+          isCurrentRules
+            ? 'rules.custom.page.feedback.saved'
+            : 'rules.custom.page.feedback.savedForProfile',
+          { name: selected?.name ?? selectedUid },
+        ),
+      )
 
       return true
     } catch (err: any) {
