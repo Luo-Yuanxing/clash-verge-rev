@@ -288,6 +288,8 @@ interface ISeqProfileConfig {
   prepend: []
   append: []
   delete: []
+  /** 完全排除订阅规则，未命中一律直连 */
+  'exclude-subscription-rules'?: boolean
 }
 
 interface IProxyGroupConfig {

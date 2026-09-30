@@ -144,7 +144,12 @@ export const ConnectionRuleDialog = (props: Props) => {
 
     try {
       const { config } = await readSeqRulesDocument(rulesProperty)
-      const { prepend, append, delete: deleteList } = toSeqConfig(config)
+      const {
+        prepend,
+        append,
+        delete: deleteList,
+        excludeSubscriptionRules,
+      } = toSeqConfig(config)
 
       const existing = new Set<string>([...prepend, ...append])
       const created = rules.filter((rule) => {
@@ -171,6 +176,7 @@ export const ConnectionRuleDialog = (props: Props) => {
             prepend: nextPrepend,
             append,
             delete: deleteList,
+            excludeSubscriptionRules,
           }),
         ))
       ) {
