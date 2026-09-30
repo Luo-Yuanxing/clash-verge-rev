@@ -1,6 +1,8 @@
 import {
   ArrowDownwardRounded,
   ArrowUpwardRounded,
+  CloudDownloadRounded,
+  CloudUploadRounded,
   MemoryRounded,
 } from '@mui/icons-material'
 import type { BoxProps, SvgIconProps, TypographyProps } from '@mui/material'
@@ -46,6 +48,8 @@ export const LayoutTraffic = () => {
   const [up, upUnit] = parseTraffic(traffic?.up || 0)
   const [down, downUnit] = parseTraffic(traffic?.down || 0)
   const [inuse, inuseUnit] = parseTraffic(memory?.inuse || 0)
+  const [downTotal, downTotalUnit] = parseTraffic(traffic?.downTotal || 0)
+  const [upTotal, upTotalUnit] = parseTraffic(traffic?.upTotal || 0)
 
   const boxStyle: Pick<BoxProps, 'sx'> = {
     sx: {
@@ -135,6 +139,45 @@ export const LayoutTraffic = () => {
               <Typography {...unitStyle}>{inuseUnit}</Typography>
             </Box>
           )}
+
+          <Box
+            title={`${t('shared.labels.downloaded')} / ${t('shared.labels.uploaded')}`}
+            {...boxStyle}
+            sx={{ ...boxStyle.sx, gap: '2px', cursor: 'auto' }}
+          >
+            <CloudDownloadRounded {...iconStyle} color="primary" />
+            <Typography
+              {...valStyle}
+              color="primary"
+              sx={{ ...valStyle.sx, fontSize: '12px' }}
+            >
+              {downTotal}
+            </Typography>
+            <Typography
+              {...unitStyle}
+              sx={{ ...unitStyle.sx, flex: '0 1 24px' }}
+            >
+              {downTotalUnit}
+            </Typography>
+            <CloudUploadRounded
+              {...iconStyle}
+              color="secondary"
+              sx={{ ...iconStyle.sx, mr: '4px', ml: 0.5 }}
+            />
+            <Typography
+              {...valStyle}
+              color="secondary"
+              sx={{ ...valStyle.sx, fontSize: '12px' }}
+            >
+              {upTotal}
+            </Typography>
+            <Typography
+              {...unitStyle}
+              sx={{ ...unitStyle.sx, flex: '0 1 24px' }}
+            >
+              {upTotalUnit}
+            </Typography>
+          </Box>
         </Box>
       </Box>
     </LightweightTrafficErrorBoundary>
