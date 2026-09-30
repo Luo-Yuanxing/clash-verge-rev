@@ -21,8 +21,11 @@ export const QUICK_CONFIG_VERSION = 1
 /** 导入时新订阅名取 Base64 的前若干位 */
 export const QUICK_CONFIG_NAME_LENGTH = 8
 
-/** zip 魔数，用于区分 Verge 备份与 JSON 快捷配置 */
+/** zip 魔数，用于兼容早期未压缩的 Base64 备份 */
 const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04]
+
+/** 压缩备份载荷的版本前缀，需与 src-tauri/src/feat/backup.rs 保持一致 */
+const QUICK_CONFIG_PREFIX = 'cv1:'
 
 export interface QuickConfigPayload {
   type: string
@@ -65,9 +68,12 @@ const decodeBase64 = (base64: string): string => {
   return new TextDecoder().decode(bytes)
 }
 
-const isZipBase64 = (base64: string): boolean => {
+/** 是否为 Verge 备份载荷：`cv1:` 压缩格式或早期未压缩的 Base64 zip */
+const isBackupPayload = (text: string): boolean => {
+  if (text.startsWith(QUICK_CONFIG_PREFIX)) return true
+
   try {
-    const head = atob(base64.replace(/\s+/gu, '').slice(0, 8))
+    const head = atob(text.replace(/\s+/gu, '').slice(0, 8))
     return ZIP_MAGIC.every((byte, index) => head.charCodeAt(index) === byte)
   } catch {
     return false
@@ -93,7 +99,7 @@ const readActiveCustomRule = async (): Promise<Record<
 }
 
 /**
- * 全部范围：调用 Verge 原有备份，取回刚生成的 zip 并转成 Base64。
+ * 全部范围：调用 Verge 原有备份，取回刚生成的 zip 并转成压缩后的 Base64。
  * 备份已包含全部 profiles（含规则），因此不再附加 `custom-rule` 键。
  */
 const exportBackupBase64 = async (): Promise<string> => {
@@ -162,7 +168,7 @@ const uniqueProfileName = (items: IProfileItem[], base: string): string => {
 export const importQuickConfig = async (
   base64: string,
 ): Promise<QuickConfigImportResult> => {
-  if (isZipBase64(base64)) {
+  if (isBackupPayload(base64)) {
     try {
       const filename = await writeLocalBackupBase64(base64)
       const backupFile = await importLocalBackup(filename)

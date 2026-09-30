@@ -11,11 +11,19 @@ use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use chrono::Utc;
 use clash_verge_logging::{Type, logging, logging_error};
+use flate2::{Compression, read::DeflateDecoder, write::DeflateEncoder};
 use reqwest_dav::list_cmd::ListFile;
 use serde::Serialize;
 use smartstring::alias::String;
-use std::{env::consts::OS, path::PathBuf};
+use std::{
+    env::consts::OS,
+    io::{Read as _, Write as _},
+    path::PathBuf,
+};
 use tokio::fs;
+
+/// Version tag of the quick-config backup payload: `cv1:` + Base64(Deflate(zip)).
+const QUICK_CONFIG_PREFIX: &str = "cv1:";
 
 #[derive(Debug, Serialize)]
 pub struct LocalBackupFile {
@@ -251,7 +259,7 @@ pub async fn import_local_backup(source: String) -> Result<String> {
     Ok(file_name.to_string().into())
 }
 
-/// Read a local backup file as Base64 so the quick-config share payload can be text.
+/// Read a local backup file as a compressed Base64 payload for quick-config sharing.
 #[tracing::instrument(skip_all, level = "info", fields(filename = %filename))]
 pub async fn read_local_backup_base64(filename: String) -> Result<String> {
     let backup_dir = local_backup_dir()?;
@@ -261,15 +269,35 @@ pub async fn read_local_backup_base64(filename: String) -> Result<String> {
     }
 
     let bytes = fs::read(&target_path).await?;
-    Ok(BASE64.encode(bytes).into())
+    let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
+    encoder.write_all(&bytes)?;
+    let compressed = encoder.finish()?;
+
+    Ok(format!("{QUICK_CONFIG_PREFIX}{}", BASE64.encode(compressed)).into())
 }
 
-/// Materialize a Base64 quick-config payload into the local backup directory.
+/// Materialize a quick-config payload into the local backup directory.
+///
+/// Accepts `cv1:` Deflate payloads as well as the legacy plain Base64 zip.
 #[tracing::instrument(skip_all, level = "info")]
 pub async fn write_local_backup_base64(content: String) -> Result<String> {
-    let bytes = BASE64
-        .decode(content.trim().as_bytes())
+    let trimmed = content.trim();
+    let encoded = trimmed.strip_prefix(QUICK_CONFIG_PREFIX).unwrap_or(trimmed);
+
+    let raw = BASE64
+        .decode(encoded.as_bytes())
         .map_err(|err| anyhow!("Invalid Base64 backup payload: {err}"))?;
+
+    let bytes = if trimmed.starts_with(QUICK_CONFIG_PREFIX) {
+        let mut decoder = DeflateDecoder::new(raw.as_slice());
+        let mut inflated = Vec::new();
+        decoder
+            .read_to_end(&mut inflated)
+            .map_err(|err| anyhow!("Failed to decompress backup payload: {err}"))?;
+        inflated
+    } else {
+        raw
+    };
 
     let zip_name: std::string::String = format!("{OS}-backup-{}.zip", chrono::Local::now().format("%Y-%m-%d_%H-%M-%S"));
     let (file_name, target_path) = unique_backup_path(&local_backup_dir()?, &zip_name)?;
