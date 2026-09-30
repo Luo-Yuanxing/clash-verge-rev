@@ -100,43 +100,50 @@ const CustomRulesPage = () => {
     setDeleteSeq,
     disabledSeq,
     setDisabledSeq,
+    savedSeq,
+    setSavedSeq,
     excludeSubscriptionRules,
     setExcludeSubscriptionRules,
   } = useSeqRuleConfig(selected?.option?.rules ?? '', !!selected)
 
   const rulesProperty = selected?.option?.rules
 
-  const rows = useMemo<SeqRuleRow[]>(
-    () => [
-      ...prependSeq.map((rule) => ({
-        rule,
-        source: 'prepend' as const,
-        enabled: true,
-      })),
-      ...appendSeq.map((rule) => ({
-        rule,
-        source: 'append' as const,
-        enabled: true,
-      })),
-      ...disabledSeq.prepend.map((rule) => ({
-        rule,
-        source: 'prepend' as const,
-        enabled: false,
-      })),
-      ...disabledSeq.append.map((rule) => ({
-        rule,
-        source: 'append' as const,
-        enabled: false,
-      })),
-    ],
-    [prependSeq, appendSeq, disabledSeq],
+  /** 文件里保存为启用的规则，未保存的勾选不会改变它 */
+  const savedEnabledKeys = useMemo(
+    () =>
+      new Set([
+        ...savedSeq.prepend.map((rule) => `prepend\u0000${rule}`),
+        ...savedSeq.append.map((rule) => `append\u0000${rule}`),
+      ]),
+    [savedSeq],
   )
+
+  const rows = useMemo<SeqRuleRow[]>(() => {
+    const build = (
+      rules: string[],
+      source: SeqRuleSource,
+      enabled: boolean,
+    ): SeqRuleRow[] =>
+      rules.map((rule) => ({
+        rule,
+        source,
+        enabled,
+        savedEnabled: savedEnabledKeys.has(`${source}\u0000${rule}`),
+      }))
+
+    return [
+      ...build(prependSeq, 'prepend', true),
+      ...build(appendSeq, 'append', true),
+      ...build(disabledSeq.prepend, 'prepend', false),
+      ...build(disabledSeq.append, 'append', false),
+    ]
+  }, [prependSeq, appendSeq, disabledSeq, savedEnabledKeys])
 
   const filteredRows = useMemo(() => {
     const matched = rows.filter(
-      ({ rule, enabled }) =>
+      ({ rule, savedEnabled }) =>
         (visibility === 'all' ||
-          (visibility === 'enabled' ? enabled : !enabled)) &&
+          (visibility === 'enabled' ? savedEnabled : !savedEnabled)) &&
         match(rule),
     )
     // 原始顺序即规则命中的顺序（prepend → append）
@@ -176,6 +183,7 @@ const CustomRulesPage = () => {
       }
 
       applyDraft(next)
+      setSavedSeq(next)
       setDirtyUid('')
       return true
     } catch (err: any) {

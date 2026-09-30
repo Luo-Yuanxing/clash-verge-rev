@@ -27,7 +27,10 @@ export type { SeqRuleSource }
 /** 列表筛选视图：全部 / 只看启用 / 只看已关闭 */
 export type SeqRuleVisibility = 'all' | 'enabled' | 'disabled'
 
-export type SeqRuleRow = SeqRuleRef
+export interface SeqRuleRow extends SeqRuleRef {
+  /** 文件里已保存的启用状态：筛选分组只看它，未保存的勾选不会提前换组 */
+  savedEnabled: boolean
+}
 
 interface Props {
   rows: SeqRuleRow[]

@@ -54,6 +54,14 @@ export const toSeqConfig = (
   excludeSubscriptionRules: config?.['exclude-subscription-rules'] ?? false,
 })
 
+export const emptySeqRulesConfig = (): SeqRulesConfig => ({
+  prepend: [],
+  append: [],
+  delete: [],
+  disabled: emptySeqRulesDisabled(),
+  excludeSubscriptionRules: false,
+})
+
 /** 序列化 Rules 配置文件，与可视化编辑器保持一致 */
 export const serializeSeqRules = (config: SeqRulesConfig): string => {
   const { disabled } = config

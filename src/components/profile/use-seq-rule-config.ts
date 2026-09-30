@@ -4,8 +4,10 @@ import { showNotice } from '@/services/notice-service'
 import { parseYamlSafe } from '@/utils/yaml'
 
 import {
+  emptySeqRulesConfig,
   emptySeqRulesDisabled,
   readSeqRulesDocument,
+  type SeqRulesConfig,
   type SeqRulesDisabled,
   serializeSeqRules,
   toSeqConfig,
@@ -28,6 +30,8 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
   )
   const [excludeSubscriptionRules, setExcludeSubscriptionRules] =
     useState(false)
+  /** 文件里已保存的配置：未保存的改动不影响以它为准的分组与筛选 */
+  const [savedSeq, setSavedSeq] = useState<SeqRulesConfig>(emptySeqRulesConfig)
   const [ruleList, setRuleList] = useState<string[]>([])
   const hasLoadedSeqConfigRef = useRef(false)
 
@@ -60,6 +64,7 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
       setDeleteSeq(removed)
       setDisabledSeq(disabled)
       setExcludeSubscriptionRules(excludeSubscriptionRules)
+      setSavedSeq(toSeqConfig(config))
     })()
   }, [active, property])
 
@@ -91,6 +96,7 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
     setDeleteSeq(removed)
     setDisabledSeq(disabled)
     setExcludeSubscriptionRules(exclude)
+    setSavedSeq(toSeqConfig(config))
     setVisualization(true)
   }
 
@@ -112,6 +118,7 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
       setDeleteSeq(removed)
       setDisabledSeq(disabled)
       setExcludeSubscriptionRules(excludeSubscriptionRules)
+      setSavedSeq(toSeqConfig(config))
     }
   }, [property])
 
@@ -177,6 +184,8 @@ export const useSeqRuleConfig = (property: string, active: boolean) => {
     setDeleteSeq,
     disabledSeq,
     setDisabledSeq,
+    savedSeq,
+    setSavedSeq,
     excludeSubscriptionRules,
     setExcludeSubscriptionRules,
     ruleList,
