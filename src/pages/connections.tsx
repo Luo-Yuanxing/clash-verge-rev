@@ -52,8 +52,8 @@ import {
   pruneConnectionHistory,
   setConnectionHistoryWindow,
   useConnectionData,
-  useConnectionHistoryInRange,
 } from '@/hooks/use-connection-data'
+import { useConnectionLogHistory } from '@/hooks/use-connection-log'
 import {
   HISTORY_WINDOW_OPTIONS,
   useConnectionSetting,
@@ -150,10 +150,11 @@ const ConnectionsPage = () => {
   /** 默认隐藏主机已被自定义规则覆盖的记录 */
   const hideCovered = setting.hideCoveredHosts ?? true
 
-  /** 仅在该界面打开时按固定周期刷新，关闭后停止 */
-  const rangeConnections = useConnectionHistoryInRange(historyWindowMs, {
-    enabled: pageVisible && connectionsType === 'history',
-  })
+  /** 历史列表的数据源是内核日志事件流，仅在该界面打开时订阅并按固定周期刷新 */
+  const { connections: rangeConnections, clear: clearRangeConnections } =
+    useConnectionLogHistory(historyWindowMs, {
+      enabled: pageVisible && connectionsType === 'history',
+    })
 
   useEffect(() => {
     setConnectionHistoryWindow(historyWindowMs)
@@ -745,11 +746,14 @@ const ConnectionsPage = () => {
             bottom: isTableLayout ? 70 : 16,
           }}
           color="primary"
-          onClick={() =>
-            connectionsType === 'history'
-              ? clearHistoryConnections()
-              : clearClosedConnections()
-          }
+          onClick={() => {
+            if (connectionsType === 'history') {
+              clearRangeConnections()
+              clearHistoryConnections()
+              return
+            }
+            clearClosedConnections()
+          }}
         >
           <DeleteForeverRounded sx={{ mr: 1 }} fontSize="small" />
           {t('shared.actions.clear')}

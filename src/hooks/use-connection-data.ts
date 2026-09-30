@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-} from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 const MAX_CLOSED_CONNS_NUM = 500
@@ -323,27 +317,6 @@ export const clearConnectionHistoryData = () => {
   notifyConnectionListeners()
 }
 
-/**
- * Connections whose lifetime interval overlaps `[from, to]`.
- *
- * A connection is treated as continuous from `startAt` (the start time
- * reported by the core) until `lastSeen`; connections that are still alive
- * have no end and therefore always overlap. Results are limited to what the
- * history window still holds.
- */
-export const getConnectionsInRange = (
-  from: number,
-  to: number = Date.now(),
-): ConnectionHistoryItem[] => {
-  const rangeStart = Math.min(from, to)
-  const rangeEnd = Math.max(from, to)
-
-  return connectionData.historyConnections.filter((item) => {
-    if (item.startAt > rangeEnd) return false
-    return item.active || item.lastSeen >= rangeStart
-  })
-}
-
 const mergeConnectionSummary = (
   payload: ConnectionSummaryPayload,
 ): ConnectionSummaryData => ({
@@ -553,40 +526,6 @@ const subscribeConnectionSummary = (listener: ConnectionListener) => {
     summaryListeners.delete(listener)
     summarySupervisor.stopIfIdle()
   }
-}
-
-const DEFAULT_RANGE_REFRESH_MS = 5_000
-const EMPTY_CONNECTION_LIST: ConnectionHistoryItem[] = []
-
-/**
- * Connections that were alive at any point within the last `durationMs`.
- *
- * The range is recomputed on a fixed interval instead of on every snapshot, so
- * the history view stays cheap; leaving the page stops the timer. The active
- * and closed lists are left untouched.
- */
-export const useConnectionHistoryInRange = (
-  durationMs: number,
-  options?: { enabled?: boolean; refreshMs?: number },
-) => {
-  const enabled = options?.enabled ?? true
-  const refreshMs = options?.refreshMs ?? DEFAULT_RANGE_REFRESH_MS
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    if (!enabled) return
-
-    const timer = window.setInterval(() => setNow(Date.now()), refreshMs)
-    return () => window.clearInterval(timer)
-  }, [enabled, refreshMs])
-
-  return useMemo(
-    () =>
-      enabled
-        ? getConnectionsInRange(now - durationMs, now)
-        : EMPTY_CONNECTION_LIST,
-    [enabled, now, durationMs],
-  )
 }
 
 const clearClosedConnectionData = () => {
