@@ -1,3 +1,5 @@
+import { useLocalStorage } from 'foxact/use-local-storage'
+import { useCallback, useEffect, useMemo } from 'react'
 import { MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
@@ -5,6 +7,15 @@ import { useTrafficMonitorEnhanced } from './use-traffic-monitor'
 
 const FALLBACK_TRAFFIC: Traffic = { up: 0, down: 0, upTotal: 0, downTotal: 0 }
 const DUPLICATE_TRAFFIC_WINDOW_MS = 50
+
+/** 手动清零后保存的累计量基线，显示值 = 内核累计值 - 基线 */
+const TRAFFIC_BASELINE_STORAGE_KEY = 'mihomo_traffic_baseline'
+const EMPTY_BASELINE: TrafficBaseline = { up: 0, down: 0 }
+
+export interface TrafficBaseline {
+  up: number
+  down: number
+}
 
 let lastTrafficSignature = ''
 let lastTrafficTimestamp = 0
@@ -59,5 +70,38 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
     }),
   })
 
-  return { response, refreshGetClashTraffic: refresh }
+  const [baseline, setBaseline] = useLocalStorage<TrafficBaseline>(
+    TRAFFIC_BASELINE_STORAGE_KEY,
+    EMPTY_BASELINE,
+  )
+
+  const rawTraffic = response.data
+  const rawUpTotal = rawTraffic?.upTotal ?? 0
+  const rawDownTotal = rawTraffic?.downTotal ?? 0
+  const baselineUp = baseline?.up ?? 0
+  const baselineDown = baseline?.down ?? 0
+
+  // 内核重启后累计量会从 0 重新计数，此时旧基线失效，直接丢弃
+  useEffect(() => {
+    if (rawUpTotal < baselineUp || rawDownTotal < baselineDown) {
+      setBaseline(EMPTY_BASELINE)
+    }
+  }, [rawUpTotal, rawDownTotal, baselineUp, baselineDown, setBaseline])
+
+  const data = useMemo<ITrafficItem>(
+    () => ({
+      up: rawTraffic?.up ?? 0,
+      down: rawTraffic?.down ?? 0,
+      upTotal: Math.max(0, rawUpTotal - baselineUp),
+      downTotal: Math.max(0, rawDownTotal - baselineDown),
+    }),
+    [rawTraffic, rawUpTotal, rawDownTotal, baselineUp, baselineDown],
+  )
+
+  /** 清零上传量与下载量的累计显示 */
+  const resetTraffic = useCallback(() => {
+    setBaseline({ up: rawUpTotal, down: rawDownTotal })
+  }, [rawUpTotal, rawDownTotal, setBaseline])
+
+  return { response, data, resetTraffic, refreshGetClashTraffic: refresh }
 }

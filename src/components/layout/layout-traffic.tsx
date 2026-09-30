@@ -27,9 +27,7 @@ export const LayoutTraffic = () => {
   const trafficRef = useRef<TrafficRef>(null)
   const pageVisible = useVisibility()
 
-  const {
-    response: { data: traffic },
-  } = useTrafficData({ enabled: pageVisible })
+  const { data: traffic } = useTrafficData({ enabled: pageVisible })
   const {
     response: { data: memory },
   } = useMemoryData({ enabled: displayMemory && pageVisible })

@@ -122,9 +122,7 @@ const ConnectionsPage = () => {
     clearClosedConnections,
     clearHistoryConnections,
   } = useConnectionData({ enabled: pageVisible })
-  const {
-    response: { data: traffic },
-  } = useTrafficData({ enabled: pageVisible })
+  const { data: traffic } = useTrafficData({ enabled: pageVisible })
 
   const [setting, setSetting] = useConnectionSetting()
 
