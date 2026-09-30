@@ -639,6 +639,12 @@ export interface TranslationResources {
     rules: {
       custom: {
         page: {
+          columns: {
+            host: string
+            policy: string
+            selectAll: string
+            type: string
+          }
           emptyProfile: string
           emptyRules: string
           excludeSubscription: {

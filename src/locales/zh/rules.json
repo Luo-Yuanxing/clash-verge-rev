@@ -7,6 +7,12 @@
       "excludeSubscription": {
         "label": "完全排除订阅规则",
         "hint": "开启后只使用自定义规则，未命中一律直连"
+      },
+      "columns": {
+        "selectAll": "全选",
+        "host": "主机",
+        "type": "规则类型",
+        "policy": "代理策略"
       }
     }
   },

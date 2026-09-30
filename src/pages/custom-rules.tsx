@@ -3,13 +3,16 @@ import { useLockFn } from 'ahooks'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { BaseEmpty, BasePage, Switch } from '@/components/base'
+import { BaseEmpty, BasePage, BaseSearchBox, Switch } from '@/components/base'
 import {
   readSeqRulesDocument,
   serializeSeqRules,
   toSeqConfig,
 } from '@/components/profile/seq-rules-document'
-import { SeqRulesView } from '@/components/profile/seq-rules-view'
+import {
+  type SeqRuleRow,
+  SeqRulesTable,
+} from '@/components/profile/seq-rules-table'
 import { useSeqRuleConfig } from '@/components/profile/use-seq-rule-config'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVisibility } from '@/hooks/use-visibility'
@@ -49,14 +52,62 @@ const CustomRulesPage = () => {
     match,
     setMatch,
     prependSeq,
+    setPrependSeq,
     appendSeq,
-    deleteSeq,
+    setAppendSeq,
     excludeSubscriptionRules,
     setExcludeSubscriptionRules,
-    ruleList,
   } = useSeqRuleConfig(selected?.option?.rules ?? '', !!selected)
 
   const rulesProperty = selected?.option?.rules
+
+  const rows = useMemo<SeqRuleRow[]>(
+    () => [
+      ...prependSeq.map((rule) => ({ rule, source: 'prepend' as const })),
+      ...appendSeq.map((rule) => ({ rule, source: 'append' as const })),
+    ],
+    [prependSeq, appendSeq],
+  )
+
+  const filteredRows = useMemo(
+    () => rows.filter(({ rule }) => match(rule)),
+    [rows, match],
+  )
+
+  /** 删除单条自定义规则并写回文件 */
+  const handleDeleteRule = useLockFn(async ({ rule, source }: SeqRuleRow) => {
+    if (!rulesProperty) return
+
+    try {
+      const { config } = await readSeqRulesDocument(rulesProperty)
+      const current = toSeqConfig(config)
+      const nextPrepend =
+        source === 'prepend'
+          ? current.prepend.filter((item) => item !== rule)
+          : current.prepend
+      const nextAppend =
+        source === 'append'
+          ? current.append.filter((item) => item !== rule)
+          : current.append
+
+      const saved = await saveProfileFile(
+        rulesProperty,
+        serializeSeqRules({
+          ...current,
+          prepend: nextPrepend,
+          append: nextAppend,
+        }),
+      )
+
+      // 校验失败时后端已回滚并提示
+      if (!saved) return
+
+      setPrependSeq(nextPrepend)
+      setAppendSeq(nextAppend)
+    } catch (err: any) {
+      showNotice.error(err)
+    }
+  })
 
   /** 开关即保存，写回后由后端校验并应用到运行时 */
   const handleExcludeChange = useLockFn(async (next: boolean) => {
@@ -160,14 +211,15 @@ const CustomRulesPage = () => {
               flexDirection: 'column',
             }}
           >
-            <SeqRulesView
-              prependSeq={prependSeq}
-              appendSeq={appendSeq}
-              deleteSeq={deleteSeq}
-              ruleList={ruleList}
-              match={match}
-              onMatchChange={setMatch}
-            />
+            <BaseSearchBox onSearch={(next) => setMatch(() => next)} />
+            <Box sx={{ height: 'calc(100% - 32px)', marginTop: '8px' }}>
+              <SeqRulesTable
+                rows={filteredRows}
+                onDelete={(row) => {
+                  void handleDeleteRule(row)
+                }}
+              />
+            </Box>
           </Box>
         </>
       ) : (

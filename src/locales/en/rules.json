@@ -7,6 +7,12 @@
       "excludeSubscription": {
         "label": "Exclude subscription rules",
         "hint": "Only custom rules apply; unmatched requests go DIRECT"
+      },
+      "columns": {
+        "selectAll": "Select all",
+        "host": "Host",
+        "type": "Rule type",
+        "policy": "Proxy policy"
       }
     }
   },
