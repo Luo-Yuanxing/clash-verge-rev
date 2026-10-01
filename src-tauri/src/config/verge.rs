@@ -207,6 +207,10 @@ pub struct IVerge {
     pub hover_jump_navigator_delay: Option<u64>,
 
     pub enable_external_controller: Option<bool>,
+
+    /// Hosts hidden from the connection history list. Matched exactly, so a
+    /// blacklisted `api.example.com` never hides `www.example.com`.
+    pub connection_history_blocklist: Option<Vec<String>>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]

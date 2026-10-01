@@ -959,6 +959,8 @@ interface IVergeConfig {
   enable_hover_jump_navigator?: boolean
   hover_jump_navigator_delay?: number
   enable_external_controller?: boolean
+  /** 历史连接列表里要隐藏的主机，按域名严格匹配（不含端口，不做后缀匹配） */
+  connection_history_blocklist?: string[]
 }
 
 interface IWebDavFile {
