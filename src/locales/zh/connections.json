@@ -32,7 +32,8 @@
       "createRule": "创建规则",
       "probe": "主动探测",
       "probing": "探测中…",
-      "selectFailed": "选择爆红"
+      "selectFailed": "选择爆红",
+      "refresh": "重新拉取日志"
     },
     "probe": {
       "error": "{{seconds}} 秒内未收到响应，可能无法连接或被阻断"
@@ -45,6 +46,10 @@
         "desc": "当前级别为 {{level}}，内核不会输出连接日志，历史列表记录不到任何连接。",
         "action": "设为 info",
         "done": "已把内核日志级别设为 info"
+      },
+      "reload": {
+        "done": "日志流已重新连接",
+        "failed": "日志流连接失败：列表只保留已收集的记录"
       }
     },
     "filters": {

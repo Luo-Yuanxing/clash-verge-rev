@@ -32,7 +32,8 @@
       "createRule": "Create rules",
       "probe": "Probe hosts",
       "probing": "Probing…",
-      "selectFailed": "Select blocked"
+      "selectFailed": "Select blocked",
+      "refresh": "Reload log stream"
     },
     "probe": {
       "error": "No response within {{seconds}}s: unreachable or blocked"
@@ -45,6 +46,10 @@
         "desc": "The current level is {{level}}, so the core emits no connection logs and the history list cannot record anything.",
         "action": "Set to info",
         "done": "Core log level set to info"
+      },
+      "reload": {
+        "done": "Log stream reconnected",
+        "failed": "Log stream unavailable: the list keeps what was collected"
       }
     },
     "filters": {

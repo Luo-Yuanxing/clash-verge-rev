@@ -203,6 +203,22 @@ export const startConnectionLogScanning = () => {
   }, KEEP_ALIVE_CHECK_MS)
 }
 
+/**
+ * Drop the current subscription and open a new one right away.
+ *
+ * A socket the core closed without reporting an error leaves this module
+ * believing it is still subscribed, so the history list would stay silent
+ * forever; this is the manual escape hatch for exactly that case.
+ */
+export const restartConnectionLogScanning = async (): Promise<boolean> => {
+  scanning = true
+  clearReconnectTimer()
+  reconnectDelayMs = RECONNECT_DELAY_MS
+  await closeSocket()
+  await connect()
+  return socket !== null
+}
+
 export const clearConnectionLogData = () => {
   records = []
   pending = []
@@ -245,5 +261,12 @@ export const useConnectionLogHistory = (
     clearConnectionLogData()
   }, [])
 
-  return { connections, clear }
+  /** 立即把已收集但还没发布的记录推到列表，不等待下一个刷新周期 */
+  const refresh = useCallback(() => {
+    refreshPublished(durationMs)
+  }, [durationMs])
+
+  const restart = useCallback(() => restartConnectionLogScanning(), [])
+
+  return { connections, clear, refresh, restart }
 }

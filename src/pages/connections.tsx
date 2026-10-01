@@ -6,6 +6,7 @@ import {
   NetworkCheckRounded,
   PauseRounded,
   PlayArrowRounded,
+  RefreshRounded,
   RuleRounded,
   TableChartRounded,
   TableRowsRounded,
@@ -195,10 +196,14 @@ const ConnectionsPage = () => {
   const hideCovered = setting.hideCoveredHosts ?? true
 
   /** 历史列表的数据源是内核日志事件流：日志订阅常驻，列表打开时 5s 重算一次，否则 60s */
-  const { connections: rangeConnections, clear: clearRangeConnections } =
-    useConnectionLogHistory(historyWindowMs, {
-      active: pageVisible && connectionsType === 'history',
-    })
+  const {
+    connections: rangeConnections,
+    clear: clearRangeConnections,
+    refresh: refreshLogHistory,
+    restart: restartLogScanning,
+  } = useConnectionLogHistory(historyWindowMs, {
+    active: pageVisible && connectionsType === 'history',
+  })
 
   useEffect(() => {
     setConnectionHistoryWindow(historyWindowMs)
@@ -509,6 +514,26 @@ const ConnectionsPage = () => {
     }
   })
 
+  /**
+   * 手动重新拉取日志：内核那边的连接可能已经被静默关掉，而前端不会收到通知，
+   * 于是历史列表一直停在没有新记录的状态。
+   */
+  const reloadHistory = useLockFn(async () => {
+    refreshLogHistory()
+
+    try {
+      const connected = await restartLogScanning()
+      refreshLogHistory()
+      if (connected) {
+        showNotice.success(t('connections.components.history.reload.done'))
+      } else {
+        showNotice.error(t('connections.components.history.reload.failed'))
+      }
+    } catch (err) {
+      showNotice.error(err)
+    }
+  })
+
   const handleSearch = useCallback(
     (match: (content: string) => boolean, state: SearchState) => {
       setMatch(() => match)
@@ -801,6 +826,19 @@ const ConnectionsPage = () => {
             )}
           </IconButton>
         </Tooltip>
+        {connectionsType === 'history' && (
+          <Tooltip title={t('connections.components.actions.refresh')}>
+            <IconButton
+              size="small"
+              color="inherit"
+              aria-label={t('connections.components.actions.refresh')}
+              onClick={() => void reloadHistory()}
+              sx={TOOLBAR_ITEM_SHRINK}
+            >
+              <RefreshRounded fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
         {isTableLayout && hasTableData && (
           <Tooltip title={t('connections.components.columnManager.title')}>
             <IconButton

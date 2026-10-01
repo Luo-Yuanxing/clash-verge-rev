@@ -14,6 +14,7 @@ export interface TranslationResources {
           pause: string
           probe: string
           probing: string
+          refresh: string
           resume: string
           selectFailed: string
         }
@@ -61,6 +62,10 @@ export interface TranslationResources {
           }
           rangeMinutes: string
           rangeSeconds: string
+          reload: {
+            done: string
+            failed: string
+          }
         }
         order: {
           default: string
