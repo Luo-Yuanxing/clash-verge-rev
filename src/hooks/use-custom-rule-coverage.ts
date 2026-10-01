@@ -6,6 +6,7 @@ import {
   toSeqConfig,
 } from '@/components/profile/seq-rules-document'
 import { useProfiles } from '@/hooks/use-profiles'
+import { debugLog } from '@/utils/debug'
 
 const EMPTY_RULES: string[] = []
 
@@ -32,9 +33,16 @@ export const useCustomRuleCoverage = (active = true) => {
       try {
         const { config } = await readSeqRulesDocument(property)
         const { prepend, append } = toSeqConfig(config)
-        if (!cancelled) setLoaded({ property, rules: [...prepend, ...append] })
-      } catch {
+        const nextRules = [...prepend, ...append]
+        // 规则为 0 条时覆盖判断恒为 false，输出出来便于排查“不生效”
+        debugLog('[custom-rules] 覆盖判断已加载规则', {
+          property,
+          count: nextRules.length,
+        })
+        if (!cancelled) setLoaded({ property, rules: nextRules })
+      } catch (err) {
         // 读取失败按没有自定义规则处理
+        console.warn('[custom-rules] 读取规则文件失败', property, err)
         if (!cancelled) setLoaded({ property, rules: EMPTY_RULES })
       }
     })()
