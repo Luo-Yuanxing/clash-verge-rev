@@ -68,3 +68,9 @@ pnpm typecheck && pnpm lint && pnpm format:check && pnpm test
 ## 补充说明
 
 - 尽可能的不要**编译**等耗时操作,用户会自行检查,且一律不跑测试/验证性代码,但语法检查是必要的
+
+## 关于命令行
+
+pnpm 执行脚本时，会把实际运行的命令（$ eslint -c eslint.config.ts ...）输出到 stderr。PowerShell 对原生命令的 stderr 处理比较"敏感"，只要 stderr 有内容，就会包装成 NativeCommandError 显示（即使用 *> 重定向到文件也一样会打印）。
+
+退出码是 0，说明 eslint 本身没有报错。
