@@ -12,6 +12,7 @@ import {
   ViewColumnRounded,
 } from '@mui/icons-material'
 import {
+  Alert,
   Box,
   Button,
   ButtonGroup,
@@ -66,6 +67,11 @@ import { useHostProbe } from '@/hooks/use-host-probe'
 import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVerge } from '@/hooks/use-verge'
 import { useVisibility } from '@/hooks/use-visibility'
+import {
+  useAppRefreshers,
+  useClashConfigData,
+} from '@/providers/app-data-context'
+import { patchClashConfig } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 import {
   createBlocklistMatcher,
@@ -115,6 +121,15 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
 
 const EMPTY_CONNECTIONS: IConnectionsItem[] = []
 
+/** 内核只有跑到 debug / info 才会把连接写进日志，历史列表完全依赖这些日志 */
+const CONNECTION_LOG_LEVELS = ['debug', 'info']
+
+/** 归一化内核日志级别：warn 与 warning 是同一级别 */
+const normalizeCoreLogLevel = (level: unknown) => {
+  const value = typeof level === 'string' ? level.trim().toLowerCase() : ''
+  return value === 'warn' ? 'warning' : value
+}
+
 /** 工具条上的按钮与下拉不参与压缩，空间不够时整块换到下一行 */
 const TOOLBAR_ITEM_SHRINK = { flexShrink: 0 } as const
 
@@ -151,6 +166,16 @@ const ConnectionsPage = () => {
 
   const [setting, setSetting] = useConnectionSetting()
   const { verge, patchVerge } = useVerge()
+  const { clashConfig } = useClashConfigData()
+  const { refreshClashConfig } = useAppRefreshers()
+
+  /** 内核日志级别不够时历史列表必然为空，界面据此给出提示与一键修复 */
+  const coreLogLevel = normalizeCoreLogLevel(clashConfig?.['log-level'])
+  const isHistoryLogEnabled = CONNECTION_LOG_LEVELS.includes(coreLogLevel)
+  const isHistoryLogBlocked =
+    connectionsType === 'history' &&
+    Boolean(coreLogLevel) &&
+    !isHistoryLogEnabled
 
   /** 历史连接黑名单：只隐藏同名主机，按域名严格匹配 */
   const isBlockedHost = useMemo(
@@ -468,6 +493,17 @@ const ConnectionsPage = () => {
     }
   })
 
+  /** 一键把内核日志级别设为 info，历史列表随即能记录到连接 */
+  const enableHistoryLog = useLockFn(async () => {
+    try {
+      await patchClashConfig({ 'log-level': 'info' })
+      await refreshClashConfig()
+      showNotice.success(t('connections.components.history.logLevel.done'))
+    } catch (err) {
+      showNotice.error(err)
+    }
+  })
+
   const handleSearch = useCallback(
     (match: (content: string) => boolean, state: SearchState) => {
       setMatch(() => match)
@@ -774,48 +810,85 @@ const ConnectionsPage = () => {
         )}
       </Box>
 
-      {!hasTableData ? (
-        <BaseEmpty />
-      ) : isTableLayout ? (
-        <ConnectionTable
-          connections={filterConn}
-          onShowDetail={showDetailById}
-          columnManagerOpen={isColumnManagerOpen}
-          onCloseColumnManager={() => setIsColumnManagerOpen(false)}
-          selectedIds={selectedIds}
-          onToggleSelect={toggleSelect}
-          onToggleSelectAll={toggleSelectAll}
-          getHostProbeState={getHostProbeState}
-          hostWithoutPort={connectionsType === 'history'}
-          hideTrafficColumns={connectionsType === 'history'}
-        />
-      ) : (
-        <VirtualList
-          key={connectionsType}
-          count={displayRows.length}
-          estimateSize={56}
-          renderItem={(i) => (
-            <ConnectionRowItem
-              row={displayRows[i]}
-              closed={isConnectionClosed(displayRows[i]?.id ?? '')}
-              onShowDetail={showDetailById}
-              selected={selectedIds.has(displayRows[i]?.id ?? '')}
-              onToggleSelect={toggleSelect}
-              probeState={getHostProbeState(
-                displayRows[i]?.searchableHost ??
-                  displayRows[i]?.searchableDestinationIP ??
-                  '',
-              )}
-            />
-          )}
-          style={{
-            flex: 1,
-            borderRadius: '8px',
-            WebkitOverflowScrolling: 'touch',
-            overscrollBehavior: 'contain',
-          }}
-        />
+      {isHistoryLogBlocked && (
+        <Alert
+          severity="warning"
+          sx={{ mx: '10px', mb: 1, flexShrink: 0 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              sx={{ whiteSpace: 'nowrap' }}
+              onClick={() => void enableHistoryLog()}
+            >
+              {t('connections.components.history.logLevel.action')}
+            </Button>
+          }
+        >
+          <strong>{t('connections.components.history.logLevel.title')}</strong>{' '}
+          {t('connections.components.history.logLevel.desc', {
+            level: coreLogLevel,
+          })}
+        </Alert>
       )}
+
+      {/* 内核日志级别不够时列表必然为空：整块置灰并挡住交互，避免误判成功能正常 */}
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          ...(isHistoryLogBlocked && {
+            filter: 'grayscale(1)',
+            opacity: 0.4,
+            pointerEvents: 'none',
+          }),
+        }}
+      >
+        {!hasTableData ? (
+          <BaseEmpty />
+        ) : isTableLayout ? (
+          <ConnectionTable
+            connections={filterConn}
+            onShowDetail={showDetailById}
+            columnManagerOpen={isColumnManagerOpen}
+            onCloseColumnManager={() => setIsColumnManagerOpen(false)}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={toggleSelectAll}
+            getHostProbeState={getHostProbeState}
+            hostWithoutPort={connectionsType === 'history'}
+            hideTrafficColumns={connectionsType === 'history'}
+          />
+        ) : (
+          <VirtualList
+            key={connectionsType}
+            count={displayRows.length}
+            estimateSize={56}
+            renderItem={(i) => (
+              <ConnectionRowItem
+                row={displayRows[i]}
+                closed={isConnectionClosed(displayRows[i]?.id ?? '')}
+                onShowDetail={showDetailById}
+                selected={selectedIds.has(displayRows[i]?.id ?? '')}
+                onToggleSelect={toggleSelect}
+                probeState={getHostProbeState(
+                  displayRows[i]?.searchableHost ??
+                    displayRows[i]?.searchableDestinationIP ??
+                    '',
+                )}
+              />
+            )}
+            style={{
+              flex: 1,
+              borderRadius: '8px',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+            }}
+          />
+        )}
+      </Box>
       <ConnectionDetail ref={detailRef} />
       <ConnectionRuleDialog
         open={isRuleDialogOpen}
