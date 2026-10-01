@@ -1,6 +1,8 @@
 import {
+  BlockRounded,
   DeleteForeverRounded,
   FilterAltRounded,
+  FormatListBulletedRounded,
   NetworkCheckRounded,
   PauseRounded,
   PlayArrowRounded,
@@ -34,6 +36,7 @@ import {
   type SearchState,
   VirtualList,
 } from '@/components/base'
+import { ConnectionBlocklistDialog } from '@/components/connection/connection-blocklist-dialog'
 import {
   ConnectionDetail,
   ConnectionDetailRef,
@@ -61,7 +64,14 @@ import {
 import { useCustomRuleCoverage } from '@/hooks/use-custom-rule-coverage'
 import { useHostProbe } from '@/hooks/use-host-probe'
 import { useTrafficData } from '@/hooks/use-traffic-data'
+import { useVerge } from '@/hooks/use-verge'
 import { useVisibility } from '@/hooks/use-visibility'
+import { showNotice } from '@/services/notice-service'
+import {
+  createBlocklistMatcher,
+  normalizeBlockHost,
+  normalizeBlocklist,
+} from '@/utils/connection-blocklist'
 import { type HostProbeTarget, probeUrlOf } from '@/utils/connection-probe'
 import { isIpAddress } from '@/utils/network'
 import parseTraffic from '@/utils/parse-traffic'
@@ -140,6 +150,17 @@ const ConnectionsPage = () => {
   const { data: traffic } = useTrafficData({ enabled: pageVisible })
 
   const [setting, setSetting] = useConnectionSetting()
+  const { verge, patchVerge } = useVerge()
+
+  /** 历史连接黑名单：只隐藏同名主机，按域名严格匹配 */
+  const isBlockedHost = useMemo(
+    () => createBlocklistMatcher(verge?.connection_history_blocklist),
+    [verge?.connection_history_blocklist],
+  )
+  const blocklistCount = useMemo(
+    () => normalizeBlocklist(verge?.connection_history_blocklist).length,
+    [verge?.connection_history_blocklist],
+  )
 
   const isHostCovered = useCustomRuleCoverage(pageVisible)
 
@@ -168,6 +189,7 @@ const ConnectionsPage = () => {
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
   const [isRuleDialogOpen, setIsRuleDialogOpen] = useState(false)
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false)
+  const [isBlocklistDialogOpen, setIsBlocklistDialogOpen] = useState(false)
   const [paused, setPaused] = useState(false)
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -183,15 +205,15 @@ const ConnectionsPage = () => {
     historyConnections: [],
   })
 
-  /** 历史列表：指定时长内出现过的连接，可选排除裸 IP，再按主机压缩 */
+  /** 历史列表：指定时长内出现过的连接，可选排除裸 IP，再按主机压缩并剔除黑名单 */
   const historyConnections = useMemo(
     () =>
       mergeHistoryConnections(
         excludeIpConnections
           ? rangeConnections.filter((connection) => !isIpConnection(connection))
           : rangeConnections,
-      ),
-    [rangeConnections, excludeIpConnections],
+      ).filter((connection) => !isBlockedHost(connection.metadata.host)),
+    [rangeConnections, excludeIpConnections, isBlockedHost],
   )
 
   const togglePause = useCallback(() => {
@@ -339,6 +361,7 @@ const ConnectionsPage = () => {
       if (type === connectionsType) return
       detailRef.current?.close()
       setIsColumnManagerOpen(false)
+      setIsBlocklistDialogOpen(false)
       setSelectedIds(new Set())
       setConnectionsType(type)
     },
@@ -407,6 +430,43 @@ const ConnectionsPage = () => {
 
     return { ruleHosts: [...hosts], skippedHosts: skipped }
   }, [selectedConnections, selectedIds])
+
+  /** 选中连接里可加入黑名单的主机：去端口、去重，已在黑名单里的跳过 */
+  const blockHosts = useMemo(() => {
+    const hosts: string[] = []
+    const seen = new Set<string>()
+
+    for (const connection of selectedConnections) {
+      if (!selectedIds.has(connection.id)) continue
+      const host = normalizeBlockHost(connection.metadata?.host ?? '')
+      if (!host || seen.has(host) || isBlockedHost(host)) continue
+      seen.add(host)
+      hosts.push(host)
+    }
+
+    return hosts
+  }, [selectedConnections, selectedIds, isBlockedHost])
+
+  const addToBlocklist = useLockFn(async () => {
+    if (blockHosts.length === 0) return
+
+    try {
+      await patchVerge({
+        connection_history_blocklist: normalizeBlocklist([
+          ...(verge?.connection_history_blocklist ?? []),
+          ...blockHosts,
+        ]),
+      })
+      setSelectedIds(new Set())
+      showNotice.success(
+        t('connections.components.blocklist.added', {
+          count: blockHosts.length,
+        }),
+      )
+    } catch (err) {
+      showNotice.error(err)
+    }
+  })
 
   const handleSearch = useCallback(
     (match: (content: string) => boolean, state: SearchState) => {
@@ -552,6 +612,23 @@ const ConnectionsPage = () => {
             </IconButton>
           </Tooltip>
         )}
+        {connectionsType === 'history' && (
+          <Tooltip
+            title={`${t('connections.components.blocklist.title')}${
+              blocklistCount > 0 ? ` (${blocklistCount})` : ''
+            }`}
+          >
+            <IconButton
+              size="small"
+              color={blocklistCount > 0 ? 'primary' : 'inherit'}
+              aria-label={t('connections.components.blocklist.title')}
+              onClick={() => setIsBlocklistDialogOpen(true)}
+              sx={{ flex: '0 0 auto', mr: 1 }}
+            >
+              <FormatListBulletedRounded fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip
           title={t(
             probingCount > 0
@@ -641,6 +718,23 @@ const ConnectionsPage = () => {
             </span>
           </Button>
         </span>
+        {connectionsType === 'history' && (
+          <span style={TOOLBAR_ITEM_SHRINK}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<BlockRounded fontSize="small" />}
+              disabled={blockHosts.length === 0}
+              onClick={() => void addToBlocklist()}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              <span style={{ whiteSpace: 'nowrap' }}>
+                {t('connections.components.blocklist.add')}
+                {blockHosts.length > 0 ? ` (${blockHosts.length})` : ''}
+              </span>
+            </Button>
+          </span>
+        )}
         <Tooltip
           title={t(
             paused
@@ -729,6 +823,10 @@ const ConnectionsPage = () => {
         skippedCount={skippedHosts}
         onClose={() => setIsRuleDialogOpen(false)}
         onCreated={() => setSelectedIds(new Set())}
+      />
+      <ConnectionBlocklistDialog
+        open={isBlocklistDialogOpen}
+        onClose={() => setIsBlocklistDialogOpen(false)}
       />
       <Zoom
         in={connectionsType === 'history' && filterConn.length > 0}
