@@ -47,6 +47,7 @@ import { ConnectionFilterDialog } from '@/components/connection/connection-filte
 import { mergeHistoryConnections } from '@/components/connection/connection-history-merge'
 import { ConnectionRowItem } from '@/components/connection/connection-row-item'
 import {
+  getConnectionSelectKey,
   getConnectionStartTime,
   useConnectionRowViews,
 } from '@/components/connection/connection-row-view'
@@ -291,12 +292,23 @@ const ConnectionsPage = () => {
         ? viewConnections.closedConnections
         : viewConnections.activeConnections
 
+  /**
+   * 选择状态按稳定 key 记录，不按连接 id：
+   * 历史列表按主机压缩成一行，新记录并入后行的 id 会换成新连接的 id，用 id 会丢掉勾选。
+   */
+  const selectKeyOf = useCallback(
+    (connection: IConnectionsItem) =>
+      connectionsType === 'history'
+        ? getConnectionSelectKey(connection)
+        : connection.id,
+    [connectionsType],
+  )
+
   const activeConnectionIds = useMemo(() => {
     const ids = new Set<string>()
     for (const conn of viewConnections.activeConnections) ids.add(conn.id)
     return ids
   }, [viewConnections])
-
   const filterConn = useMemo(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
 
@@ -329,7 +341,10 @@ const ConnectionsPage = () => {
 
   const displayRows = useConnectionRowViews(
     isTableLayout ? EMPTY_CONNECTIONS : filterConn,
-    { hostWithoutPort: connectionsType === 'history' },
+    {
+      hostWithoutPort: connectionsType === 'history',
+      selectByHost: connectionsType === 'history',
+    },
   )
 
   const { states: hostProbeStates, run: runHostProbe } = useHostProbe()
@@ -362,10 +377,10 @@ const ConnectionsPage = () => {
     for (const connection of filterConn) {
       const host = hostKeyOfConnection(connection)
       if (host && getHostProbeState(host)?.status === 'fail')
-        ids.push(connection.id)
+        ids.push(selectKeyOf(connection))
     }
     return ids
-  }, [filterConn, getHostProbeState])
+  }, [filterConn, getHostProbeState, selectKeyOf])
 
   const failedSelectedCount = useMemo(
     () => failedConnectionIds.filter((id) => selectedIds.has(id)).length,
@@ -455,7 +470,7 @@ const ConnectionsPage = () => {
     let skipped = 0
 
     for (const connection of selectedConnections) {
-      if (!selectedIds.has(connection.id)) continue
+      if (!selectedIds.has(selectKeyOf(connection))) continue
       const host = (connection.metadata?.host ?? '').trim()
       if (!host || isIpAddress(host)) {
         skipped += 1
@@ -465,7 +480,7 @@ const ConnectionsPage = () => {
     }
 
     return { ruleHosts: [...hosts], skippedHosts: skipped }
-  }, [selectedConnections, selectedIds])
+  }, [selectedConnections, selectedIds, selectKeyOf])
 
   /** 选中连接里可加入黑名单的主机：去端口、去重，已在黑名单里的跳过 */
   const blockHosts = useMemo(() => {
@@ -473,7 +488,7 @@ const ConnectionsPage = () => {
     const seen = new Set<string>()
 
     for (const connection of selectedConnections) {
-      if (!selectedIds.has(connection.id)) continue
+      if (!selectedIds.has(selectKeyOf(connection))) continue
       const host = normalizeBlockHost(connection.metadata?.host ?? '')
       if (!host || seen.has(host) || isBlockedHost(host)) continue
       seen.add(host)
@@ -481,7 +496,7 @@ const ConnectionsPage = () => {
     }
 
     return hosts
-  }, [selectedConnections, selectedIds, isBlockedHost])
+  }, [selectedConnections, selectedIds, selectKeyOf, isBlockedHost])
 
   /** 黑名单、自定义规则这类过滤条件变化后立刻重算列表，不等下一个刷新周期 */
   const forceRefreshHistory = useCallback(() => {
@@ -904,6 +919,7 @@ const ConnectionsPage = () => {
               columnManagerOpen={isColumnManagerOpen}
               onCloseColumnManager={() => setIsColumnManagerOpen(false)}
               selectedIds={selectedIds}
+              getSelectKey={selectKeyOf}
               onToggleSelect={toggleSelect}
               onToggleSelectAll={toggleSelectAll}
               getHostProbeState={getHostProbeState}
@@ -920,7 +936,7 @@ const ConnectionsPage = () => {
                   row={displayRows[i]}
                   closed={isConnectionClosed(displayRows[i]?.id ?? '')}
                   onShowDetail={showDetailById}
-                  selected={selectedIds.has(displayRows[i]?.id ?? '')}
+                  selected={selectedIds.has(displayRows[i]?.selectKey ?? '')}
                   onToggleSelect={toggleSelect}
                   probeState={getHostProbeState(
                     displayRows[i]?.searchableHost ??
