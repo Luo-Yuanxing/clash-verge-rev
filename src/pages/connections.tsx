@@ -169,13 +169,9 @@ const ConnectionsPage = () => {
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
 
-  /** 内核日志级别不够时历史列表必然为空，界面据此给出提示与一键修复 */
+  /** 内核日志级别不够时历史列表记录不到新连接，界面据此给出提示与一键修复 */
   const coreLogLevel = normalizeCoreLogLevel(clashConfig?.['log-level'])
   const isHistoryLogEnabled = CONNECTION_LOG_LEVELS.includes(coreLogLevel)
-  const isHistoryLogBlocked =
-    connectionsType === 'history' &&
-    Boolean(coreLogLevel) &&
-    !isHistoryLogEnabled
 
   /** 历史连接黑名单：只隐藏同名主机，按域名严格匹配 */
   const isBlockedHost = useMemo(
@@ -204,6 +200,16 @@ const ConnectionsPage = () => {
   useEffect(() => {
     setConnectionHistoryWindow(historyWindowMs)
   }, [historyWindowMs])
+
+  /**
+   * 只有在「级别不足」且「窗口内确实一条记录都没有」时才判定历史记录不可用：
+   * 刚把级别调低时窗口里还留着之前记下的连接，此时表格照常显示，不该置灰。
+   */
+  const isHistoryLogBlocked =
+    connectionsType === 'history' &&
+    Boolean(coreLogLevel) &&
+    !isHistoryLogEnabled &&
+    rangeConnections.length === 0
 
   useEffect(() => {
     pruneConnectionHistory()
