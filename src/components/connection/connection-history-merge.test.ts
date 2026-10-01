@@ -114,6 +114,31 @@ describe('mergeHistoryConnections', () => {
     expect(merged.map((item) => item.id)).toEqual(['a', 'b', 'c'])
   })
 
+  it('keeps every failed dial as its own row', () => {
+    const merged = mergeHistoryConnections([
+      connection('fail-1', 'web.telegram.org', {
+        failed: true,
+        start: '2026-01-01T00:00:00Z',
+      }),
+      connection('fail-2', 'web.telegram.org', {
+        failed: true,
+        start: '2026-01-01T00:05:00Z',
+      }),
+      connection('ok', 'web.telegram.org', {
+        start: '2026-01-01T00:10:00Z',
+      }),
+      connection('ok-2', 'web.telegram.org', {
+        start: '2026-01-01T00:15:00Z',
+      }),
+    ])
+
+    expect(merged.map((item) => item.id)).toEqual([
+      'fail-1',
+      'fail-2',
+      'ok-2',
+    ])
+  })
+
   it('ignores host case when merging', () => {
     const merged = mergeHistoryConnections([
       connection('a', 'Example.COM'),

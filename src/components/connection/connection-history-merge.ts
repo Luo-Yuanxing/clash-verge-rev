@@ -2,8 +2,11 @@ import type { ConnectionHistoryItem } from '@/hooks/use-connection-data'
 
 import { getConnectionStartTime } from './connection-row-view'
 
-/** 合并键：同一主机压缩成一行，没有主机名的连接各自保留 */
+/** 合并键：同一主机压缩成一行，没有主机名或 dial 失败的连接各自保留 */
 const historyMergeKey = (connection: ConnectionHistoryItem) => {
+  // 失败记录不合并：同一主机失败了几次、各自是什么时候，都是有用的信息
+  if (connection.failed) return `id:${connection.id}`
+
   const host = connection.metadata.host.trim().toLowerCase()
   return host || `id:${connection.id}`
 }
