@@ -80,12 +80,10 @@ type VisibilityState = Record<string, boolean>
 interface BaseColumn {
   field: ColumnField
   headerName: string
+  /** 内容宽度量不出来时的兜底宽度 */
   width: number
   minWidth: number
-  maxWidth?: number
   align?: 'left' | 'right'
-  /** 未手动调整过宽度时，按列内容的实际宽度决定 */
-  autoWidth?: boolean
   /** 默认不显示，需要时可在列设置里打开 */
   defaultHidden?: boolean
   cell?: (row: IConnectionsItem, snapshot: TableRowSnapshot) => string
@@ -118,15 +116,16 @@ interface TableRowSnapshot {
   downloadSpeedText: string
 }
 
+/**
+ * 列宽优先按内容算：内容量不出来时才用固定宽度。
+ * 内容宽度不做 maxWidth 截断，否则链路这类长文本会被硬截成 “IPv6 • 剩”。
+ */
 const resolveColumnSize = (
   column: BaseColumn,
   autoSize: number | undefined,
 ) => {
-  const bounded = (size: number) =>
-    column.maxWidth === undefined ? size : Math.min(column.maxWidth, size)
-
   if (typeof autoSize === 'number' && Number.isFinite(autoSize)) {
-    return bounded(Math.max(column.minWidth, autoSize))
+    return Math.max(column.minWidth, autoSize)
   }
 
   return column.width
@@ -407,7 +406,6 @@ const RowComponent = memo(
               boxSizing: 'border-box',
               flex: `0 0 ${column.size}px`,
               minWidth: column.minWidth,
-              maxWidth: column.maxWidth,
               padding: '8px',
               fontSize: 13,
               display: 'flex',
@@ -529,7 +527,6 @@ export const ConnectionTable = (props: Props) => {
         headerName: t('connections.components.fields.host'),
         width: 180,
         minWidth: 140,
-        autoWidth: true,
       },
       {
         field: 'download',
@@ -568,21 +565,18 @@ export const ConnectionTable = (props: Props) => {
         headerName: t('connections.components.fields.chains'),
         width: 56,
         minWidth: 48,
-        maxWidth: 56,
       },
       {
         field: 'rule',
         headerName: t('connections.components.fields.rule'),
         width: 220,
         minWidth: 80,
-        autoWidth: true,
       },
       {
         field: 'process',
         headerName: t('connections.components.fields.process'),
         width: 180,
         minWidth: 80,
-        autoWidth: true,
       },
       {
         field: 'time',
@@ -691,14 +685,12 @@ export const ConnectionTable = (props: Props) => {
     }
   }, [theme.typography.fontFamily])
 
-  /** 自适应列的宽度：列名与当前列表内容里最宽的一项 */
+  /** 列宽 = 列名与当前列表内容里最宽的一项，保证文本完整显示 */
   const autoColumnWidths = useMemo(() => {
     const widths = new Map<ColumnField, number>()
     if (!measureText) return widths
 
     for (const column of availableColumns) {
-      if (!column.autoWidth) continue
-
       let width = measureText(column.headerName) + CELL_PADDING_WIDTH
 
       for (const connection of connections) {
@@ -722,7 +714,10 @@ export const ConnectionTable = (props: Props) => {
     width: 0,
   })
 
-  /** 列宽先按内容与固定值算出，再等比拉伸填满窗口 */
+  /**
+   * 列宽先按内容算出：内容宽过窗口时整表横向滚动，宽裕时按比例分配、最后一列吸收余量。
+   * 溢出的情况下谁也不压缩，保证主机与链路文本都完整。
+   */
   const visibleColumns = useMemo(() => {
     const columns = orderedColumns
       .filter((column) => isColumnVisible(column, columnVisibilityModel))
@@ -738,24 +733,14 @@ export const ConnectionTable = (props: Props) => {
     const scale = available / total
     let used = 0
     return columns.map((column, index) => {
-      const scaled = Math.floor(column.size * scale)
-      const bounded =
-        column.maxWidth === undefined
-          ? scaled
-          : Math.min(column.maxWidth, scaled)
       // 最后一列吸收取整余量，避免总和超出容器
       if (index === columns.length - 1) {
-        const rest = available - used
-        return {
-          ...column,
-          size:
-            column.maxWidth === undefined
-              ? rest
-              : Math.min(column.maxWidth, rest),
-        }
+        return { ...column, size: available - used }
       }
-      used += bounded
-      return { ...column, size: bounded }
+
+      const size = Math.floor(column.size * scale)
+      used += size
+      return { ...column, size }
     })
   }, [columnVisibilityModel, orderedColumns, autoColumnWidths, viewport.width])
 
@@ -1010,7 +995,6 @@ export const ConnectionTable = (props: Props) => {
                       boxSizing: 'border-box',
                       flex: `0 0 ${column.size}px`,
                       minWidth: column.minWidth,
-                      maxWidth: column.maxWidth,
                       fontSize: 13,
                       fontWeight: 600,
                       color: textSecondary,
