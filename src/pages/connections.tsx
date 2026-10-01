@@ -169,8 +169,11 @@ const ConnectionsPage = () => {
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
 
-  /** 内核日志级别高于 info 时历史列表不会有记录，直接把表格关掉并给出修复入口 */
-  const coreLogLevel = normalizeCoreLogLevel(clashConfig?.['log-level'])
+  /**
+   * 内核日志级别高于 info（debug / info 之外）时历史列表不会有记录，直接把表格关掉并给出修复入口。
+   * 注意 BaseConfig 是 camelCase 的 `logLevel`，值形如 `WARNING` / `INFO`。
+   */
+  const coreLogLevel = normalizeCoreLogLevel(clashConfig?.logLevel)
   const isHistoryLogEnabled = HISTORY_LOG_LEVELS.includes(coreLogLevel)
 
   /** 历史连接黑名单：只隐藏同名主机，按域名严格匹配 */
@@ -815,7 +818,7 @@ const ConnectionsPage = () => {
       {isHistoryLogDisabled && (
         <Alert
           severity="warning"
-          sx={{ mx: '10px', mb: 1, flexShrink: 0 }}
+          sx={{ mx: '10px', mt: '100px', mb: 1, flexShrink: 0 }}
           action={
             <Button
               color="inherit"
