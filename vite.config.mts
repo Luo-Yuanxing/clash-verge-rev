@@ -13,7 +13,16 @@ export default defineConfig({
     // next to the target and rename it in place. Watching those short-lived
     // temp files races with the rename and kills the dev server with EBUSY on
     // Windows, so ignore them. Vite merges this with its default ignore list.
-    watch: { ignored: ['**/.*tmpdir/**'] },
+    //
+    // Ignoring them also swallows the notification for the replacement itself:
+    // the rename the watcher reports carries the temp path, which lands in the
+    // ignore list, so the edit never reaches HMR. Polling detects the change by
+    // itself and cannot miss it, at the cost of a little CPU.
+    watch: {
+      ignored: ['**/.*tmpdir/**'],
+      usePolling: true,
+      interval: 400,
+    },
   },
   plugins: [
     svgr(),
