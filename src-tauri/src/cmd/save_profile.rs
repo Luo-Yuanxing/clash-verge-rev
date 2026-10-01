@@ -7,12 +7,23 @@ use crate::{
         CoreManager, handle,
         validate::{CoreConfigValidator, ValidationOutcome},
     },
-    module::auto_backup::{AutoBackupManager, AutoBackupTrigger},
+    module::{
+        auto_backup::{AutoBackupManager, AutoBackupTrigger},
+        rules_backup,
+    },
     utils::dirs,
 };
 use clash_verge_logging::{Type, logging, logging_error};
 use smartstring::alias::String;
 use tokio::fs;
+
+/// 存档只按文件名归类：rules 文件都平铺在 profiles 目录下
+fn rules_backup_file_name(rel_path: &str) -> &str {
+    std::path::Path::new(rel_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(rel_path)
+}
 
 /// 保存profiles的配置
 #[tauri::command]
@@ -29,15 +40,16 @@ pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdR
     };
 
     // 在异步操作前获取必要元数据并释放锁
-    let (rel_path, is_merge_file, is_script_file, affects_runtime) = {
+    let (rel_path, is_merge_file, is_script_file, is_rules_file, affects_runtime) = {
         let profiles = Config::profiles().await;
         let profiles_guard = profiles.latest_arc();
         let item = profiles_guard.get_item(&index).stringify_err()?;
         let is_merge = item.itype.as_ref().is_some_and(|t| t == "merge");
         let path = item.file.clone().ok_or("file field is null")?;
         let is_script = item.itype.as_ref().is_some_and(|t| t == "script") || path.ends_with(".js");
+        let is_rules = item.itype.as_deref() == Some("rules");
         let affects_runtime = profile_affects_runtime(&profiles_guard, &index);
-        (path, is_merge, is_script, affects_runtime)
+        (path, is_merge, is_script, is_rules, affects_runtime)
     };
 
     let profiles_dir = dirs::app_profiles_dir().stringify_err()?;
@@ -62,6 +74,16 @@ pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdR
     } else {
         String::new()
     };
+
+    // 自定义规则每次写回前留一份改动前的存档，存档失败不影响本次保存
+    let rules_backup_file = rules_backup_file_name(&rel_path);
+    if is_rules_file
+        && original_existed
+        && original_content != file_data
+        && let Err(err) = rules_backup::store(rules_backup_file, &original_content).await
+    {
+        logging!(warn, Type::Config, "[cmd配置save] 规则存档失败: {err:#}");
+    }
 
     // 保存新的配置文件
     fs::write(&file_path, &file_data).await.stringify_err()?;

@@ -200,6 +200,8 @@ mod app_init {
             cmd::delete_profile,
             cmd::read_profile_file,
             cmd::save_profile_file,
+            cmd::list_rules_backups,
+            cmd::read_rules_backup,
             cmd::get_next_update_time,
             cmd::create_local_backup,
             cmd::list_local_backup,
