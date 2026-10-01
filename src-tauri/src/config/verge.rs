@@ -497,6 +497,7 @@ impl IVerge {
         patch!(enable_dns_settings);
         patch!(home_cards);
         patch!(enable_external_controller);
+        patch!(connection_history_blocklist);
     }
 
     pub fn get_log_level(&self) -> LevelFilter {
