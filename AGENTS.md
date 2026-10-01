@@ -1,4 +1,4 @@
-﻿# Agent Guidelines
+# Agent Guidelines
 
 本仓库是 Clash Verge Rev 的**个人 fork**（`Luo-Yuanxing/clash-verge-rev`），只有一名开发者。
 上游 `clash-verge-rev/clash-verge-rev` 的协作流程、审查策略与提交规范在此**不适用**；
@@ -45,8 +45,9 @@ hook 已通过 `git config --local core.hooksPath .git/hooks-disabled` 关闭。
 - pnpm 12.8.1：`%LOCALAPPDATA%\pnpm\bin\pnpm.CMD`；Node 24.21.0。
 - 依赖与 sidecar 二进制已就绪（`node_modules`、`src-tauri/sidecar`、`src-tauri/resources`）。
 - `pnpm install` 会往 `pnpm-lock.yaml` 写 `@pnpm/exe` 条目；提交前用 `git restore pnpm-lock.yaml` 丢弃这一噪声。
-- 工作区检出为 CRLF、索引为 LF（`core.autocrlf`）。biome 的 `format:check` 要求工作区文件为 CRLF；
-  bash 脚本（`scripts-workflow/*.sh`）要求 LF，`Changelog.md` 保持 LF 才能通过。
+- 全仓统一 LF 行尾：`.gitattributes` 用 `* text=auto eol=lf`，本仓库 `core.autocrlf=false`。
+  `core.autocrlf` 的全局默认是 `true`，会持续把工作区文件改写成 CRLF，不要打开它。
+  `*.sh`/`*.bash` 与 `Changelog.md` 必须保持 LF（Git Bash、上游 CI 与 `merge=union` 都依赖这一点）。
 
 ## 提交前检查
 
@@ -67,4 +68,3 @@ pnpm typecheck && pnpm lint && pnpm format:check && pnpm test
 ## 补充说明
 
 - 尽可能的不要**编译**等耗时操作,用户会自行检查,且一律不跑测试/验证性代码,但语法检查是必要的
-- CRLF和LF以后不要处理
