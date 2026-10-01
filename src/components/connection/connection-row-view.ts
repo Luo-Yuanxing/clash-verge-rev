@@ -1,5 +1,7 @@
 import { useMemo, useRef } from 'react'
 
+import type { ConnectionDialFlags } from '@/hooks/use-connection-data'
+
 const TRAFFIC_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
 
 export interface ConnectionRowView {
@@ -22,10 +24,22 @@ export interface ConnectionRowView {
   uploadSpeed: number
   downloadSpeed: number
   startTime: number
+  /** The dial failed, so this row never had a live connection */
+  failed: boolean
+  /** Reason the core printed for the failed dial */
+  dialError: string
   searchableHost: string
   searchableDestinationIP: string
   searchableProcess: string
 }
+
+/**
+ * 失败信息只存在于日志解析出来的历史记录里，内核返回的连接没有这两个字段。
+ */
+export const getConnectionDialFlags = (
+  connection: IConnectionsItem,
+): ConnectionDialFlags =>
+  connection as IConnectionsItem & ConnectionDialFlags
 
 export const formatConnectionTraffic = (value?: number) => {
   if (typeof value !== 'number') return 'NaN'
@@ -99,6 +113,7 @@ const createConnectionRowView = (
 ) => {
   const uploadSpeed = connection.curUpload ?? 0
   const downloadSpeed = connection.curDownload ?? 0
+  const { failed, dialError } = getConnectionDialFlags(connection)
 
   return {
     id: connection.id,
@@ -122,6 +137,8 @@ const createConnectionRowView = (
     uploadSpeed,
     downloadSpeed,
     startTime: getConnectionStartTime(connection),
+    failed: Boolean(failed),
+    dialError: dialError ?? '',
     searchableHost: connection.metadata.host || '',
     searchableDestinationIP: connection.metadata.destinationIP || '',
     searchableProcess: connection.metadata.process || '',
@@ -149,6 +166,8 @@ const sameConnectionRowView = (
   left.download === right.download &&
   left.uploadSpeed === right.uploadSpeed &&
   left.downloadSpeed === right.downloadSpeed &&
+  left.failed === right.failed &&
+  left.dialError === right.dialError &&
   left.searchableHost === right.searchableHost &&
   left.searchableDestinationIP === right.searchableDestinationIP &&
   left.searchableProcess === right.searchableProcess

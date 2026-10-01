@@ -97,8 +97,17 @@ export const ConnectionRowItem = memo(
       [onToggleSelect, row.id],
     )
     const showTraffic = row.uploadSpeed >= 100 || row.downloadSpeed >= 100
-    const failed = probeState?.status === 'fail'
+    // dial 失败是内核报出来的，探测失败是主动探测出来的，两者都标红
+    const probeFailed = probeState?.status === 'fail'
+    const failed = row.failed || probeFailed
     const errorColor = useTheme().palette.error.main
+    const failedReason = row.failed
+      ? row.dialError
+      : probeFailed
+        ? t('connections.components.probe.error', {
+            seconds: HOST_PROBE_WINDOW_MS / 1000,
+          })
+        : ''
 
     return (
       <div style={itemStyle}>
@@ -109,15 +118,7 @@ export const ConnectionRowItem = memo(
           sx={{ flexShrink: 0, p: 0.5 }}
         />
         <div style={contentStyle} onClick={handleShowDetail}>
-          <Tooltip
-            title={
-              failed
-                ? t('connections.components.probe.error', {
-                    seconds: HOST_PROBE_WINDOW_MS / 1000,
-                  })
-                : ''
-            }
-          >
+          <Tooltip title={failedReason}>
             <div
               style={{
                 ...primaryStyle,
@@ -135,6 +136,17 @@ export const ConnectionRowItem = memo(
             <span style={tagStyle}>
               <RelativeTime start={row.time} />
             </span>
+            {row.failed && (
+              <span
+                style={{
+                  ...tagStyle,
+                  color: errorColor,
+                  borderColor: errorColor,
+                }}
+              >
+                {t('connections.components.fields.failed')}
+              </span>
+            )}
             {showTraffic && (
               <span style={tagStyle}>
                 {row.uploadSpeedText} / {row.downloadSpeedText}

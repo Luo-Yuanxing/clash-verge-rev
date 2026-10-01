@@ -25,6 +25,7 @@ import {
   formatConnectionChains,
   formatConnectionTraffic,
   getConnectionDestination,
+  getConnectionDialFlags,
   getConnectionHost,
   getConnectionHostName,
   getConnectionProcess,
@@ -294,14 +295,16 @@ const renderCell = (
     return <RelativeTime start={snapshot.row.start} />
 
   const value = getConnectionCellValue(column.field, snapshot)
-  if (column.field !== 'host' || !getHostProbeState) return value
+  if (column.field !== 'host') return value
 
-  const state = getHostProbeState(hostKeyOf(snapshot))
-  // 探测不到回应（连接失败或被墙）的主机标红，并在悬浮时说明原因
-  if (state?.status !== 'fail') return value
+  // 探测不到回应（连接失败或被墙）与内核报出的 dial 失败都在悬浮时说明原因
+  const { failed, dialError } = getConnectionDialFlags(row)
+  const probeFailed =
+    getHostProbeState?.(hostKeyOf(snapshot))?.status === 'fail'
+  if (!failed && !probeFailed) return value
 
   return (
-    <Tooltip title={hostProbeError}>
+    <Tooltip title={failed ? (dialError ?? '') : hostProbeError}>
       <span
         style={{
           overflow: 'hidden',

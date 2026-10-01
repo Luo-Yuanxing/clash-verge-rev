@@ -38,6 +38,7 @@ export interface TranslationResources {
           destination: string
           destinationPort: string
           dlSpeed: string
+          failed: string
           host: string
           process: string
           rule: string

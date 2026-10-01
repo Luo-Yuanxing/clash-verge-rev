@@ -7,6 +7,8 @@ import { closeConnection } from 'tauri-plugin-mihomo-api'
 
 import parseTraffic from '@/utils/parse-traffic'
 
+import { getConnectionDialFlags } from './connection-row-view'
+
 export interface ConnectionDetailRef {
   open: (detail: IConnectionsItem, closed: boolean) => void
   close: () => void
@@ -70,6 +72,7 @@ interface InnerProps {
 const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
   const { t } = useTranslation()
   const { metadata, rulePayload } = data
+  const { failed, dialError } = getConnectionDialFlags(data)
   const theme = useTheme()
   const chains = [...data.chains].reverse().join(' / ')
   const rule = rulePayload ? `${data.rule}(${rulePayload})` : data.rule
@@ -84,6 +87,14 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
       value: chains,
     },
     { label: t('connections.components.fields.rule'), value: rule },
+    ...(failed
+      ? [
+          {
+            label: t('connections.components.fields.failed'),
+            value: dialError ?? '',
+          },
+        ]
+      : []),
     {
       label: t('connections.components.fields.process'),
       value: `${metadata.process}${metadata.processPath ? `(${metadata.processPath})` : ''}`,
