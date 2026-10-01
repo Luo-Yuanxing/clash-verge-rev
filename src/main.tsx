@@ -61,7 +61,29 @@ const initializeApp = (initialThemeMode: 'light' | 'dark') => {
   )
 }
 
+/**
+ * Rust keeps its websocket connections across a webview reload, so the stale
+ * ones are dropped on load. The log subscription has to wait for that cleanup:
+ * a socket opened before it finishes gets closed underneath us, and this module
+ * never learns that its subscription is dead.
+ */
+const wsCleanupDone = new Promise<void>((resolve) => {
+  const cleanup = () => {
+    MihomoWebSocket.cleanupAll()
+      .catch(() => {})
+      .finally(() => resolve())
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', cleanup, { once: true })
+  } else {
+    cleanup()
+  }
+})
+
 const bootstrap = async () => {
+  await wsCleanupDone
+
   // The core log stream feeds the connection history list, so it is subscribed
   // once for the whole app lifetime and never stops.
   startConnectionLogScanning()
@@ -101,12 +123,6 @@ window.addEventListener('unhandledrejection', (event) => {
 
 // Page close/refresh events
 window.addEventListener('beforeunload', () => {
-  // Clean up all WebSocket instances to prevent memory leaks
-  MihomoWebSocket.cleanupAll()
-})
-
-// Page loaded event
-window.addEventListener('DOMContentLoaded', () => {
   // Clean up all WebSocket instances to prevent memory leaks
   MihomoWebSocket.cleanupAll()
 })
