@@ -121,8 +121,8 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
 
 const EMPTY_CONNECTIONS: IConnectionsItem[] = []
 
-/** 内核只有跑到 debug / info 才会把连接写进日志，历史列表完全依赖这些日志 */
-const CONNECTION_LOG_LEVELS = ['debug', 'info']
+/** 历史列表完全依赖内核日志：级别不高于 info（debug / info）时连接才会写进日志 */
+const HISTORY_LOG_LEVELS = ['debug', 'info']
 
 /** 归一化内核日志级别：warn 与 warning 是同一级别 */
 const normalizeCoreLogLevel = (level: unknown) => {
@@ -169,9 +169,9 @@ const ConnectionsPage = () => {
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
 
-  /** 内核日志级别不够时历史列表记录不到新连接，界面据此给出提示与一键修复 */
+  /** 内核日志级别高于 info 时历史列表不会有记录，直接把表格关掉并给出修复入口 */
   const coreLogLevel = normalizeCoreLogLevel(clashConfig?.['log-level'])
-  const isHistoryLogEnabled = CONNECTION_LOG_LEVELS.includes(coreLogLevel)
+  const isHistoryLogEnabled = HISTORY_LOG_LEVELS.includes(coreLogLevel)
 
   /** 历史连接黑名单：只隐藏同名主机，按域名严格匹配 */
   const isBlockedHost = useMemo(
@@ -201,15 +201,11 @@ const ConnectionsPage = () => {
     setConnectionHistoryWindow(historyWindowMs)
   }, [historyWindowMs])
 
-  /**
-   * 只有在「级别不足」且「窗口内确实一条记录都没有」时才判定历史记录不可用：
-   * 刚把级别调低时窗口里还留着之前记下的连接，此时表格照常显示，不该置灰。
-   */
-  const isHistoryLogBlocked =
+  /** 级别不是 info（且已读到级别）时，历史表格整体停用 */
+  const isHistoryLogDisabled =
     connectionsType === 'history' &&
     Boolean(coreLogLevel) &&
-    !isHistoryLogEnabled &&
-    rangeConnections.length === 0
+    !isHistoryLogEnabled
 
   useEffect(() => {
     pruneConnectionHistory()
@@ -816,7 +812,7 @@ const ConnectionsPage = () => {
         )}
       </Box>
 
-      {isHistoryLogBlocked && (
+      {isHistoryLogDisabled && (
         <Alert
           severity="warning"
           sx={{ mx: '10px', mb: 1, flexShrink: 0 }}
@@ -838,63 +834,62 @@ const ConnectionsPage = () => {
         </Alert>
       )}
 
-      {/* 内核日志级别不够时列表必然为空：整块置灰并挡住交互，避免误判成功能正常 */}
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          ...(isHistoryLogBlocked && {
-            filter: 'grayscale(1)',
-            opacity: 0.4,
-            pointerEvents: 'none',
-          }),
-        }}
-      >
-        {!hasTableData ? (
-          <BaseEmpty />
-        ) : isTableLayout ? (
-          <ConnectionTable
-            connections={filterConn}
-            onShowDetail={showDetailById}
-            columnManagerOpen={isColumnManagerOpen}
-            onCloseColumnManager={() => setIsColumnManagerOpen(false)}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
-            onToggleSelectAll={toggleSelectAll}
-            getHostProbeState={getHostProbeState}
-            hostWithoutPort={connectionsType === 'history'}
-            hideTrafficColumns={connectionsType === 'history'}
-          />
-        ) : (
-          <VirtualList
-            key={connectionsType}
-            count={displayRows.length}
-            estimateSize={56}
-            renderItem={(i) => (
-              <ConnectionRowItem
-                row={displayRows[i]}
-                closed={isConnectionClosed(displayRows[i]?.id ?? '')}
-                onShowDetail={showDetailById}
-                selected={selectedIds.has(displayRows[i]?.id ?? '')}
-                onToggleSelect={toggleSelect}
-                probeState={getHostProbeState(
-                  displayRows[i]?.searchableHost ??
-                    displayRows[i]?.searchableDestinationIP ??
-                    '',
-                )}
-              />
-            )}
-            style={{
-              flex: 1,
-              borderRadius: '8px',
-              WebkitOverflowScrolling: 'touch',
-              overscrollBehavior: 'contain',
-            }}
-          />
-        )}
-      </Box>
+      {/* 级别不是 info 时内核不会记录连接，表格直接关掉，只留上面的提示与一键设置 */}
+      {isHistoryLogDisabled ? (
+        <BaseEmpty />
+      ) : (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {!hasTableData ? (
+            <BaseEmpty />
+          ) : isTableLayout ? (
+            <ConnectionTable
+              connections={filterConn}
+              onShowDetail={showDetailById}
+              columnManagerOpen={isColumnManagerOpen}
+              onCloseColumnManager={() => setIsColumnManagerOpen(false)}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              getHostProbeState={getHostProbeState}
+              hostWithoutPort={connectionsType === 'history'}
+              hideTrafficColumns={connectionsType === 'history'}
+            />
+          ) : (
+            <VirtualList
+              key={connectionsType}
+              count={displayRows.length}
+              estimateSize={56}
+              renderItem={(i) => (
+                <ConnectionRowItem
+                  row={displayRows[i]}
+                  closed={isConnectionClosed(displayRows[i]?.id ?? '')}
+                  onShowDetail={showDetailById}
+                  selected={selectedIds.has(displayRows[i]?.id ?? '')}
+                  onToggleSelect={toggleSelect}
+                  probeState={getHostProbeState(
+                    displayRows[i]?.searchableHost ??
+                      displayRows[i]?.searchableDestinationIP ??
+                      '',
+                  )}
+                />
+              )}
+              style={{
+                flex: 1,
+                borderRadius: '8px',
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain',
+              }}
+            />
+          )}
+        </Box>
+      )}
       <ConnectionDetail ref={detailRef} />
       <ConnectionRuleDialog
         open={isRuleDialogOpen}
@@ -908,7 +903,11 @@ const ConnectionsPage = () => {
         onClose={() => setIsBlocklistDialogOpen(false)}
       />
       <Zoom
-        in={connectionsType === 'history' && filterConn.length > 0}
+        in={
+          connectionsType === 'history' &&
+          !isHistoryLogDisabled &&
+          filterConn.length > 0
+        }
         unmountOnExit
       >
         <Fab
