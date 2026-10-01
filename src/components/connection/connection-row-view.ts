@@ -6,6 +6,8 @@ const TRAFFIC_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
 
 export interface ConnectionRowView {
   id: string
+  /** 选择框的稳定 key，见 getConnectionSelectKey */
+  selectKey: string
   host: string
   process: string
   network: string
@@ -84,6 +86,15 @@ export const getConnectionHostName = (connection: IConnectionsItem) => {
   )
 }
 
+/**
+ * 选择框的稳定 key：历史列表按主机名压缩成一行，行的 id 会随着并入的新记录变化，
+ * 所以这里用主机名；没有主机名时该行不会被合并，退回连接 id。
+ */
+export const getConnectionSelectKey = (connection: IConnectionsItem) => {
+  const host = connection.metadata?.host?.trim().toLowerCase() ?? ''
+  return host || `id:${connection.id}`
+}
+
 export const getConnectionProcess = (connection: IConnectionsItem) => {
   const { metadata } = connection
   return metadata.process || metadata.processPath || ''
@@ -117,6 +128,9 @@ const createConnectionRowView = (
 
   return {
     id: connection.id,
+    selectKey: options?.selectByHost
+      ? getConnectionSelectKey(connection)
+      : connection.id,
     host: options?.hostWithoutPort
       ? getConnectionHostName(connection)
       : getConnectionHost(connection),
@@ -149,6 +163,7 @@ const sameConnectionRowView = (
   left: ConnectionRowView,
   right: ConnectionRowView,
 ) =>
+  left.selectKey === right.selectKey &&
   left.host === right.host &&
   left.process === right.process &&
   left.network === right.network &&
@@ -175,6 +190,8 @@ const sameConnectionRowView = (
 export interface ConnectionRowViewOptions {
   /** 主机名不拼目标端口，历史列表按域名聚合时使用 */
   hostWithoutPort?: boolean
+  /** 选择状态按主机名而不是连接 id 记录，历史列表按域名聚合时使用 */
+  selectByHost?: boolean
 }
 
 export const useConnectionRowViews = (
@@ -182,13 +199,18 @@ export const useConnectionRowViews = (
   options?: ConnectionRowViewOptions,
 ) => {
   const hostWithoutPort = options?.hostWithoutPort ?? false
+  const selectByHost = options?.selectByHost ?? false
   const previousRowsRef = useRef(new Map<string, ConnectionRowView>())
   const previousConnectionsRef = useRef(new Map<string, IConnectionsItem>())
   const previousHostWithoutPortRef = useRef(hostWithoutPort)
+  const previousSelectByHostRef = useRef(selectByHost)
 
   return useMemo(() => {
-    const cacheValid = previousHostWithoutPortRef.current === hostWithoutPort
+    const cacheValid =
+      previousHostWithoutPortRef.current === hostWithoutPort &&
+      previousSelectByHostRef.current === selectByHost
     previousHostWithoutPortRef.current = hostWithoutPort
+    previousSelectByHostRef.current = selectByHost
 
     const previousRows = cacheValid
       ? previousRowsRef.current
@@ -210,7 +232,10 @@ export const useConnectionRowViews = (
       if (previousRow && previousConnection === connection) {
         row = previousRow
       } else {
-        const nextRow = createConnectionRowView(connection, { hostWithoutPort })
+        const nextRow = createConnectionRowView(connection, {
+          hostWithoutPort,
+          selectByHost,
+        })
         row =
           previousRow && sameConnectionRowView(previousRow, nextRow)
             ? previousRow
@@ -224,5 +249,5 @@ export const useConnectionRowViews = (
     previousRowsRef.current = nextRows
     previousConnectionsRef.current = nextConnections
     return rows
-  }, [connections, hostWithoutPort])
+  }, [connections, hostWithoutPort, selectByHost])
 }

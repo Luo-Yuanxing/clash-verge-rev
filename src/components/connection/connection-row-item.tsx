@@ -96,8 +96,8 @@ export const ConnectionRowItem = memo(
       [onShowDetail, row.id],
     )
     const handleToggleSelect = useCallback(
-      () => onToggleSelect(row.id),
-      [onToggleSelect, row.id],
+      () => onToggleSelect(row.selectKey),
+      [onToggleSelect, row.selectKey],
     )
     const showTraffic = row.uploadSpeed >= 100 || row.downloadSpeed >= 100
     // dial 失败是内核报出来的，探测失败是主动探测出来的，两者都标红

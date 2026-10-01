@@ -341,13 +341,15 @@ interface RowComponentProps {
   columns: DisplayColumn[]
   onShowDetail: (id: string) => void
   getSnapshot: (row: IConnectionsItem) => TableRowSnapshot
+  /** 选择状态的稳定 key：历史列表按主机名，其余按连接 id */
+  getSelectKey: (row: IConnectionsItem) => string
   getHostProbeState: (host: string) => HostProbeState | undefined
   hostProbeError: string
   probeErrorColor: string
   borderColor: string
   virtualTop: number
   selected: boolean
-  onToggleSelect: (id: string) => void
+  onToggleSelect: (selectKey: string) => void
 }
 
 const RowComponent = memo(
@@ -356,6 +358,7 @@ const RowComponent = memo(
     columns,
     onShowDetail,
     getSnapshot,
+    getSelectKey,
     getHostProbeState,
     hostProbeError,
     probeErrorColor,
@@ -369,8 +372,8 @@ const RowComponent = memo(
       [onShowDetail, row.id],
     )
     const handleToggleSelect = useCallback(
-      () => onToggleSelect(row.id),
-      [onToggleSelect, row.id],
+      () => onToggleSelect(getSelectKey(row)),
+      [onToggleSelect, getSelectKey, row],
     )
     const stopPropagation = useCallback(
       (event: ReactMouseEvent<HTMLDivElement>) => event.stopPropagation(),
@@ -436,6 +439,7 @@ const RowComponent = memo(
     prev.virtualTop === next.virtualTop &&
     prev.onShowDetail === next.onShowDetail &&
     prev.getSnapshot === next.getSnapshot &&
+    prev.getSelectKey === next.getSelectKey &&
     prev.getHostProbeState === next.getHostProbeState &&
     prev.hostProbeError === next.hostProbeError &&
     prev.probeErrorColor === next.probeErrorColor &&
@@ -450,8 +454,10 @@ interface Props {
   columnManagerOpen: boolean
   onCloseColumnManager: () => void
   selectedIds: ReadonlySet<string>
-  onToggleSelect: (id: string) => void
-  onToggleSelectAll: (ids: string[]) => void
+  /** 行的选择 key：历史列表按主机名聚合，其余按连接 id */
+  getSelectKey: (row: IConnectionsItem) => string
+  onToggleSelect: (selectKey: string) => void
+  onToggleSelectAll: (selectKeys: string[]) => void
   /** 主动探测结果：未响应（连接失败或被墙）的主机标红 */
   getHostProbeState: (host: string) => HostProbeState | undefined
   /** 历史列表按域名聚合，主机列只显示域名，不带目标端口 */
@@ -467,6 +473,7 @@ export const ConnectionTable = (props: Props) => {
     columnManagerOpen,
     onCloseColumnManager,
     selectedIds,
+    getSelectKey,
     onToggleSelect,
     onToggleSelectAll,
     getHostProbeState,
@@ -832,18 +839,18 @@ export const ConnectionTable = (props: Props) => {
   const selectedCount = useMemo(() => {
     let count = 0
     for (const connection of connections) {
-      if (selectedIds.has(connection.id)) count += 1
+      if (selectedIds.has(getSelectKey(connection))) count += 1
     }
     return count
-  }, [connections, selectedIds])
+  }, [connections, selectedIds, getSelectKey])
 
   const allSelected =
     connections.length > 0 && selectedCount === connections.length
   const partiallySelected = selectedCount > 0 && !allSelected
 
   const handleToggleSelectAll = useCallback(() => {
-    onToggleSelectAll(connections.map((connection) => connection.id))
-  }, [connections, onToggleSelectAll])
+    onToggleSelectAll(connections.map((connection) => getSelectKey(connection)))
+  }, [connections, getSelectKey, onToggleSelectAll])
   const handleScroll = useCallback(
     (event: ReactUIEvent<HTMLDivElement>) => {
       updateViewport(event.currentTarget)
@@ -1051,12 +1058,13 @@ export const ConnectionTable = (props: Props) => {
                       columns={visibleColumns}
                       onShowDetail={onShowDetail}
                       getSnapshot={getRowSnapshot}
+                      getSelectKey={getSelectKey}
                       getHostProbeState={getHostProbeState}
                       hostProbeError={hostProbeError}
                       probeErrorColor={theme.palette.error.main}
                       borderColor={borderColor}
                       virtualTop={index * ROW_HEIGHT}
-                      selected={selectedIds.has(row.id)}
+                      selected={selectedIds.has(getSelectKey(row))}
                       onToggleSelect={onToggleSelect}
                     />
                   )
