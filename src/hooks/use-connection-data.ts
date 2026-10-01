@@ -10,7 +10,17 @@ const CONNECTION_RECONNECT_DELAY_MS = 1_000
 export const DEFAULT_HISTORY_WINDOW_MS = 10 * 60 * 1_000
 const MIN_HISTORY_WINDOW_MS = 5_000
 
-export interface ConnectionHistoryItem extends IConnectionsItem {
+/** Failure information only the records parsed out of the core log can carry */
+export interface ConnectionDialFlags {
+  /** The dial failed: the core logs it but never creates a connection for it */
+  failed?: boolean
+  /** Reason the core printed for the failed dial */
+  dialError?: string
+}
+
+export interface ConnectionHistoryItem
+  extends IConnectionsItem,
+    ConnectionDialFlags {
   /** Connection start time, parsed from the core-provided start field */
   startAt: number
   /** Last snapshot the connection was observed in, i.e. the end of its closed interval */

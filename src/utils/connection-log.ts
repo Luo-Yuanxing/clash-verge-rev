@@ -4,6 +4,16 @@ import type { ConnectionHistoryItem } from '@/hooks/use-connection-data'
 const CONNECTION_LINE =
   /^\[(TCP|UDP)]\s+(\S+?)(?:\(([^)]*)\))?\s+-->\s+(\S+)\s+match\s+(\S+?)(?:\((.*?)\))?\s+using\s+(.+?)\s*$/
 
+/**
+ * `[TCP] dial DIRECT (match Match/) 127.0.0.1:52341 --> web.telegram.org:443 error: connect failed: ...`
+ *
+ * The core logs this line for every failed dial attempt and only emits the
+ * `match ... using ...` line once a dial succeeded, so a failed dial never has
+ * a connection record of its own.
+ */
+const DIAL_ERROR_LINE =
+  /^\[(TCP|UDP)]\s+dial\s+(.+?)\s+(?:\(match\s+([^/)]+)\/([^)]*)\)\s+)?(\S+?)(?:\(([^)]*)\))?\s+-->\s+(\S+)\s+error:\s*(.+)$/
+
 /** The core wraps the message in key=value pairs: `time="..." level=info msg="[TCP] ..."` */
 const LOG_MESSAGE = /\bmsg="(.*)"\s*$/
 const LOG_TIME = /\btime="([^"]+)"/
@@ -32,39 +42,31 @@ const parseChains = (outbound: string): string[] => {
   return [group, ...hops]
 }
 
-/**
- * Turn one core log line into a connection record.
- *
- * The line is the only place where short lived connections show up: the
- * connections API only reports a snapshot once per second, so anything that
- * opens and closes in between never appears in it.
- */
-export const parseConnectionLogLine = (
-  payload: string,
-  receivedAt: number,
-): ConnectionHistoryItem | null => {
-  const message = LOG_MESSAGE.exec(payload)?.[1] ?? payload
-  const match = CONNECTION_LINE.exec(message)
-  if (!match) return null
+interface ParsedLine {
+  network: string
+  source: string
+  process: string
+  destination: string
+  rule: string
+  rulePayload: string
+  chains: string[]
+  failed?: boolean
+  dialError?: string
+}
 
-  const [, network, source, process, destination, rule, rulePayload, outbound] =
-    match
-
-  const [sourceIP, sourcePort] = splitHostPort(source)
-  const [host, destinationPort] = splitHostPort(destination)
-  const timeText = LOG_TIME.exec(payload)?.[1]
-  // The core logs nanoseconds, which Date.parse does not accept consistently.
-  const startAt =
-    (timeText
-      ? Date.parse(timeText.replace(/(\.\d{3})\d+/, '$1'))
-      : Number.NaN) || receivedAt
+const createItem = (
+  line: ParsedLine,
+  startAt: number,
+): ConnectionHistoryItem => {
+  const [sourceIP, sourcePort] = splitHostPort(line.source)
+  const [host, destinationPort] = splitHostPort(line.destination)
 
   sequence += 1
 
   return {
     id: `log-${startAt}-${sequence}`,
     metadata: {
-      network: network.toLowerCase(),
+      network: line.network,
       type: '',
       host,
       sourceIP,
@@ -72,17 +74,92 @@ export const parseConnectionLogLine = (
       destinationPort,
       destinationIP: '',
       remoteDestination: '',
-      process: process ?? '',
+      process: line.process,
       processPath: '',
     },
     upload: 0,
     download: 0,
     start: new Date(startAt).toISOString(),
-    chains: parseChains(outbound),
-    rule: rule ?? '',
-    rulePayload: rulePayload ?? '',
+    chains: line.chains,
+    rule: line.rule,
+    rulePayload: line.rulePayload,
     startAt,
     lastSeen: startAt,
     active: false,
+    ...(line.failed ? { failed: true, dialError: line.dialError } : {}),
   }
+}
+
+/** The core logs nanoseconds, which Date.parse does not accept consistently. */
+const startTimeOf = (payload: string, receivedAt: number) => {
+  const timeText = LOG_TIME.exec(payload)?.[1]
+  return (
+    (timeText ? Date.parse(timeText.replace(/(\.\d{3})\d+/, '$1')) : Number.NaN) ||
+    receivedAt
+  )
+}
+
+/**
+ * Turn one core log line into a connection record.
+ *
+ * The core log is the only place where short lived connections show up: the
+ * connections API only reports a snapshot once per second, so anything that
+ * opens and closes in between never appears in it. The same goes for a dial
+ * that failed, which the core reports as an error line only.
+ */
+export const parseConnectionLogLine = (
+  payload: string,
+  receivedAt: number,
+): ConnectionHistoryItem | null => {
+  const message = LOG_MESSAGE.exec(payload)?.[1] ?? payload
+  const startAt = startTimeOf(payload, receivedAt)
+
+  const dialErrorMatch = DIAL_ERROR_LINE.exec(message)
+  if (dialErrorMatch) {
+    const [
+      ,
+      network,
+      outbound,
+      rule,
+      rulePayload,
+      source,
+      process,
+      destination,
+      error,
+    ] = dialErrorMatch
+
+    return createItem(
+      {
+        network: network.toLowerCase(),
+        source,
+        process: process ?? '',
+        destination,
+        rule: rule ?? '',
+        rulePayload: rulePayload ?? '',
+        chains: parseChains(outbound),
+        failed: true,
+        dialError: error.trim(),
+      },
+      startAt,
+    )
+  }
+
+  const match = CONNECTION_LINE.exec(message)
+  if (!match) return null
+
+  const [, network, source, process, destination, rule, rulePayload, outbound] =
+    match
+
+  return createItem(
+    {
+      network: network.toLowerCase(),
+      source,
+      process: process ?? '',
+      destination,
+      rule: rule ?? '',
+      rulePayload: rulePayload ?? '',
+      chains: parseChains(outbound),
+    },
+    startAt,
+  )
 }

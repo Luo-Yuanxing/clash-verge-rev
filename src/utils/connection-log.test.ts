@@ -61,6 +61,42 @@ describe('parseConnectionLogLine', () => {
     expect(record?.lastSeen).toBe(999)
   })
 
+  it('records a failed dial, which a successful line never covers', () => {
+    const record = parseConnectionLogLine(
+      line(
+        '[TCP] dial DIRECT (match Match/) 127.0.0.1:52341 --> web.telegram.org:443 error: connect failed: dial tcp 157.240.20.8:443: i/o timeout',
+      ),
+      0,
+    )
+
+    expect(record?.failed).toBe(true)
+    expect(record?.dialError).toBe(
+      'connect failed: dial tcp 157.240.20.8:443: i/o timeout',
+    )
+    expect(record?.metadata.host).toBe('web.telegram.org')
+    expect(record?.metadata.sourcePort).toBe('52341')
+    expect(record?.rule).toBe('Match')
+    expect(record?.rulePayload).toBe('')
+    expect(record?.chains).toEqual(['DIRECT'])
+    expect(record?.active).toBe(false)
+    expect(record?.startAt).toBe(Date.parse('2026-09-21T02:04:58.599+08:00'))
+  })
+
+  it('parses a failed dial with an ipv6 source and no rule', () => {
+    const record = parseConnectionLogLine(
+      line(
+        '[TCP] dial Proxy[HK-01] [fdfe:dcba:9876::1]:52755 --> web.telegram.org:443 error: connect failed: dial tcp [2a03:2880:f107:83:face:b00c:0:25de]:443: i/o timeout',
+      ),
+      5,
+    )
+
+    expect(record?.failed).toBe(true)
+    expect(record?.metadata.sourceIP).toBe('fdfe:dcba:9876::1')
+    expect(record?.metadata.sourcePort).toBe('52755')
+    expect(record?.rule).toBe('')
+    expect(record?.chains).toEqual(['Proxy', 'HK-01'])
+  })
+
   it('ignores unrelated log lines', () => {
     expect(
       parseConnectionLogLine(line('[DNS] resolve www.google.com'), 0),
