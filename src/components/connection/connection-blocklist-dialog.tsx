@@ -25,10 +25,16 @@ import { normalizeBlocklist } from '@/utils/connection-blocklist'
 interface Props {
   open: boolean
   onClose: () => void
+  /** 黑名单变化后立刻刷新历史列表，不等下一个刷新周期 */
+  onChanged?: () => void
 }
 
 /** 历史连接黑名单：查看条目并勾选恢复（移出黑名单） */
-export const ConnectionBlocklistDialog = ({ open, onClose }: Props) => {
+export const ConnectionBlocklistDialog = ({
+  open,
+  onClose,
+  onChanged,
+}: Props) => {
   const { t } = useTranslation()
   const { verge, patchVerge } = useVerge()
 
@@ -102,6 +108,7 @@ export const ConnectionBlocklistDialog = ({ open, onClose }: Props) => {
         ),
       })
       setSelected(new Set())
+      onChanged?.()
       showNotice.success(
         t('connections.components.blocklist.restored', {
           count: restoring.length,

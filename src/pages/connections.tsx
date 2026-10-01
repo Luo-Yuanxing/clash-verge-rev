@@ -187,7 +187,8 @@ const ConnectionsPage = () => {
     [verge?.connection_history_blocklist],
   )
 
-  const isHostCovered = useCustomRuleCoverage(pageVisible)
+  const { isHostCovered, reload: reloadCustomRules } =
+    useCustomRuleCoverage(pageVisible)
 
   const historyWindowMs = setting.historyWindowMs ?? DEFAULT_HISTORY_WINDOW_MS
   /** 默认排除裸 IP 的历史记录 */
@@ -482,6 +483,12 @@ const ConnectionsPage = () => {
     return hosts
   }, [selectedConnections, selectedIds, isBlockedHost])
 
+  /** 黑名单、自定义规则这类过滤条件变化后立刻重算列表，不等下一个刷新周期 */
+  const forceRefreshHistory = useCallback(() => {
+    reloadCustomRules()
+    refreshLogHistory()
+  }, [reloadCustomRules, refreshLogHistory])
+
   const addToBlocklist = useLockFn(async () => {
     if (blockHosts.length === 0) return
 
@@ -493,6 +500,7 @@ const ConnectionsPage = () => {
         ]),
       })
       setSelectedIds(new Set())
+      forceRefreshHistory()
       showNotice.success(
         t('connections.components.blocklist.added', {
           count: blockHosts.length,
@@ -937,11 +945,17 @@ const ConnectionsPage = () => {
         hosts={ruleHosts}
         skippedCount={skippedHosts}
         onClose={() => setIsRuleDialogOpen(false)}
-        onCreated={() => setSelectedIds(new Set())}
+        onCreated={() => {
+          setSelectedIds(new Set())
+          forceRefreshHistory()
+          // 新建规则会重启内核，日志流也要重新订阅
+          void restartLogScanning()
+        }}
       />
       <ConnectionBlocklistDialog
         open={isBlocklistDialogOpen}
         onClose={() => setIsBlocklistDialogOpen(false)}
+        onChanged={forceRefreshHistory}
       />
       <Zoom
         in={
