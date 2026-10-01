@@ -38,7 +38,13 @@
     },
     "history": {
       "rangeSeconds": "近 {{count}} 秒",
-      "rangeMinutes": "近 {{count}} 分钟"
+      "rangeMinutes": "近 {{count}} 分钟",
+      "logLevel": {
+        "title": "历史连接需要内核日志级别为 info",
+        "desc": "当前级别为 {{level}}，内核不会输出连接日志，历史列表记录不到任何连接。",
+        "action": "设为 info",
+        "done": "已把内核日志级别设为 info"
+      }
     },
     "filters": {
       "title": "筛选",

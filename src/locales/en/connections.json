@@ -38,7 +38,13 @@
     },
     "history": {
       "rangeSeconds": "Last {{count}}s",
-      "rangeMinutes": "Last {{count}}min"
+      "rangeMinutes": "Last {{count}}min",
+      "logLevel": {
+        "title": "History needs the core log level set to info",
+        "desc": "The current level is {{level}}, so the core emits no connection logs and the history list cannot record anything.",
+        "action": "Set to info",
+        "done": "Core log level set to info"
+      }
     },
     "filters": {
       "title": "Filters",

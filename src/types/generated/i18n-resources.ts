@@ -50,6 +50,12 @@ export interface TranslationResources {
           title: string
         }
         history: {
+          logLevel: {
+            action: string
+            desc: string
+            done: string
+            title: string
+          }
           rangeMinutes: string
           rangeSeconds: string
         }
