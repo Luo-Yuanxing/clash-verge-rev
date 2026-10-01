@@ -9,13 +9,14 @@ const CONNECTION_LINE =
  *
  * The core logs this line for every failed dial attempt and only emits the
  * `match ... using ...` line once a dial succeeded, so a failed dial never has
- * a connection record of its own.
+ * a connection record of its own. Every attempt of one dial is reported in a
+ * single message, which is why the reason spans lines.
  */
 const DIAL_ERROR_LINE =
-  /^\[(TCP|UDP)]\s+dial\s+(.+?)\s+(?:\(match\s+([^/)]+)\/([^)]*)\)\s+)?(\S+?)(?:\(([^)]*)\))?\s+-->\s+(\S+)\s+error:\s*(.+)$/
+  /\[(TCP|UDP)]\s+dial\s+(.+?)\s+(?:\(match\s+([^/)]+)\/([^)]*)\)\s+)?(\S+?)(?:\(([^)]*)\))?\s+-->\s+(\S+)\s+error:\s*([\s\S]*)$/
 
 /** The core wraps the message in key=value pairs: `time="..." level=info msg="[TCP] ..."` */
-const LOG_MESSAGE = /\bmsg="(.*)"\s*$/
+const LOG_MESSAGE = /\bmsg="([\s\S]*?)"\s*$/
 const LOG_TIME = /\btime="([^"]+)"/
 
 let sequence = 0
@@ -138,7 +139,8 @@ export const parseConnectionLogLine = (
         rulePayload: rulePayload ?? '',
         chains: parseChains(outbound),
         failed: true,
-        dialError: error.trim(),
+        // 未闭合的引号只可能来自兜底路径，去掉它免得混进失败原因里
+        dialError: error.trim().replace(/"$/, ''),
       },
       startAt,
     )

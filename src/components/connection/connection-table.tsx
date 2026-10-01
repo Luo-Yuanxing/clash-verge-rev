@@ -282,6 +282,9 @@ const hostKeyOf = (snapshot: TableRowSnapshot) =>
   snapshot.row.metadata.destinationIP?.trim() ||
   ''
 
+/** dial 失败原因可能有多行（每次尝试一行） */
+const reasonTextStyle = { whiteSpace: 'pre-line' } as const
+
 const renderCell = (
   column: DisplayColumn,
   row: IConnectionsItem,
@@ -304,7 +307,15 @@ const renderCell = (
   if (!failed && !probeFailed) return value
 
   return (
-    <Tooltip title={failed ? (dialError ?? '') : hostProbeError}>
+    <Tooltip
+      title={
+        failed ? (
+          <span style={reasonTextStyle}>{dialError ?? ''}</span>
+        ) : (
+          hostProbeError
+        )
+      }
+    >
       <span
         style={{
           overflow: 'hidden',

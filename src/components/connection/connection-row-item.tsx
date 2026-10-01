@@ -77,6 +77,9 @@ const actionStyle = {
   transform: 'translateY(-50%)',
 } as const
 
+/** dial 失败原因可能有多行（每次尝试一行） */
+const tooltipTextStyle = { whiteSpace: 'pre-line' } as const
+
 export const ConnectionRowItem = memo(
   function ConnectionRowItem({
     row,
@@ -118,7 +121,15 @@ export const ConnectionRowItem = memo(
           sx={{ flexShrink: 0, p: 0.5 }}
         />
         <div style={contentStyle} onClick={handleShowDetail}>
-          <Tooltip title={failedReason}>
+          <Tooltip
+            title={
+              failedReason ? (
+                <span style={tooltipTextStyle}>{failedReason}</span>
+              ) : (
+                ''
+              )
+            }
+          >
             <div
               style={{
                 ...primaryStyle,

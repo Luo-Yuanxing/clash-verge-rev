@@ -97,6 +97,33 @@ describe('parseConnectionLogLine', () => {
     expect(record?.chains).toEqual(['Proxy', 'HK-01'])
   })
 
+  it('keeps a multi line dial reason, which the core reports in one message', () => {
+    const record = parseConnectionLogLine(
+      `time="2026-10-01T09:02:00.123456700+08:00" level=warning msg="[TCP] dial DIRECT (match Match/) [fdfe:dcba:9876::1]:63100 --> optimizationguide-pa.googleapis.com:443 error: connect failed: dial tcp 172.217.113.4:443: i/o timeout
+dial tcp 172.217.118.4:443: i/o timeout"`,
+      0,
+    )
+
+    expect(record?.failed).toBe(true)
+    expect(record?.metadata.host).toBe('optimizationguide-pa.googleapis.com')
+    expect(record?.metadata.sourceIP).toBe('fdfe:dcba:9876::1')
+    expect(record?.dialError).toBe(
+      'connect failed: dial tcp 172.217.113.4:443: i/o timeout\ndial tcp 172.217.118.4:443: i/o timeout',
+    )
+  })
+
+  it('parses a dial error that arrives without the key=value wrapper', () => {
+    const record = parseConnectionLogLine(
+      'time="2026-10-01T09:02:00.123456700+08:00" level=warning msg="[TCP] dial DIRECT (match Match/) [fdfe:dcba:9876::1]:53294 --> web.telegram.org:443 error: connect failed: dial tcp 157.240.20.8:443: i/o timeout',
+      0,
+    )
+
+    expect(record?.metadata.host).toBe('web.telegram.org')
+    expect(record?.dialError).toBe(
+      'connect failed: dial tcp 157.240.20.8:443: i/o timeout',
+    )
+  })
+
   it('ignores unrelated log lines', () => {
     expect(
       parseConnectionLogLine(line('[DNS] resolve www.google.com'), 0),

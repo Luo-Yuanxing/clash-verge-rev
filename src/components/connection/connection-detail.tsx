@@ -152,6 +152,7 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
           <span
             style={{
               wordBreak: 'break-all',
+              whiteSpace: 'pre-line',
               color: theme.palette.text.primary,
             }}
           >
