@@ -1,10 +1,9 @@
 name: Release Build
 
 on:
-  push:
-    # -rc tag 时预览发布, 跳过 telegram 通知、跳过 winget 提交、跳过 latest.json 文件更新
-    tags:
-      - 'v*.*.*'
+  # 本 fork 没有签名、winget、telegram 等发布所需的 secrets，
+  # 版本一律本地构建后手动上传 release，此 workflow 永久禁用，不随 tag 自动触发。
+  workflow_dispatch:
 permissions: write-all
 env:
   CARGO_INCREMENTAL: 0
