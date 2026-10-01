@@ -17,6 +17,16 @@ export interface TranslationResources {
           resume: string
           selectFailed: string
         }
+        blocklist: {
+          add: string
+          added: string
+          empty: string
+          hint: string
+          restore: string
+          restored: string
+          selectAll: string
+          title: string
+        }
         columnManager: {
           dragHandle: string
           title: string

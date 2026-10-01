@@ -45,6 +45,16 @@
       "excludeIp": "Exclude IP connections",
       "hideCovered": "Hide hosts covered by custom rules"
     },
+    "blocklist": {
+      "title": "History blocklist",
+      "hint": "Hides history rows with the exact same hostname; ports are ignored and subdomains do not match: blocking api.example.com keeps www.example.com visible",
+      "empty": "The blocklist is empty",
+      "add": "Block hosts",
+      "selectAll": "Select all",
+      "restore": "Restore selected",
+      "added": "Blocked {{count}} host(s)",
+      "restored": "Restored {{count}} host(s)"
+    },
     "columnManager": {
       "title": "Columns",
       "dragHandle": "Drag handle"
