@@ -1,4 +1,4 @@
-# Agent Guidelines
+﻿# Agent Guidelines
 
 本仓库是 Clash Verge Rev 的**个人 fork**（`Luo-Yuanxing/clash-verge-rev`），只有一名开发者。
 上游 `clash-verge-rev/clash-verge-rev` 的协作流程、审查策略与提交规范在此**不适用**；
