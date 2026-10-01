@@ -303,6 +303,16 @@ interface ISeqProfileConfig {
   'exclude-subscription-rules'?: boolean
 }
 
+/** 自定义规则的一份本地存档 */
+interface IRulesBackupInfo {
+  /** 存档文件名 */
+  name: string
+  /** 存档创建时间，毫秒时间戳 */
+  created: number
+  /** 存档大小，字节 */
+  size: number
+}
+
 interface IProxyGroupConfig {
   name: string
   type: 'select' | 'url-test' | 'fallback' | 'load-balance' | 'relay'

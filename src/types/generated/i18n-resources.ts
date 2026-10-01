@@ -709,6 +709,18 @@ export interface TranslationResources {
           actions: {
             save: string
           }
+          backup: {
+            action: string
+            dialogTitle: string
+            empty: string
+            entry: string
+            feedback: {
+              restored: string
+            }
+            hint: string
+            preview: string
+            restore: string
+          }
           columns: {
             delete: string
             deleteAll: string

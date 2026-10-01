@@ -55,6 +55,19 @@ export async function saveRulesFile(
   return invoke<ValidationOutcome>('save_profile_file', { index, fileData })
 }
 
+/**
+ * 列出某个订阅自定义规则的本地存档，按时间从新到旧。
+ * 每次写回规则文件前，后端都会把改动前的版本存为一份存档，最多保留 10 份。
+ */
+export async function listRulesBackups(index: string) {
+  return invoke<IRulesBackupInfo[]>('list_rules_backups', { index })
+}
+
+/** 读取一份存档的内容用于预览，名字必须来自 {@link listRulesBackups} */
+export async function readRulesBackup(index: string, name: string) {
+  return invoke<string>('read_rules_backup', { index, name })
+}
+
 export async function importProfile(url: string, option?: IProfileOption) {
   return invoke<void>('import_profile', {
     url,

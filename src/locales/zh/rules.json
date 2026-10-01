@@ -29,6 +29,18 @@
         "confirmTitle": "删除规则",
         "confirmText": "确认删除选中的 {{count}} 条规则？删除后无法撤销。"
       },
+      "backup": {
+        "action": "恢复",
+        "dialogTitle": "规则存档",
+        "entry": "{{count}} 条规则 · {{size}}",
+        "empty": "该订阅还没有存档",
+        "preview": "存档内容",
+        "hint": "每次保存都会自动留存一份改动前的存档，最多保留 10 份",
+        "restore": "恢复此存档",
+        "feedback": {
+          "restored": "已恢复存档，内核已重启"
+        }
+      },
       "migrate": {
         "action": "迁移",
         "feedback": {

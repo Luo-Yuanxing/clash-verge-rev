@@ -1,6 +1,7 @@
 import {
   ContentCopyRounded,
   DeleteForeverRounded,
+  RestoreRounded,
   SaveRounded,
   SortRounded,
 } from '@mui/icons-material'
@@ -20,6 +21,10 @@ import {
   compareRulesByHostLevel,
   moveItem,
 } from '@/components/profile/rule-fields'
+import {
+  type SeqRulesBackup,
+  SeqRulesBackupDialog,
+} from '@/components/profile/seq-rules-backup-dialog'
 import {
   applyRuleEnabled,
   findFirstNonEmptyRulesUid,
@@ -76,6 +81,10 @@ const CustomRulesPage = () => {
   }>({ uid: '', ids: [] })
   /** 一键删除前的确认对话框 */
   const [confirmDelete, setConfirmDelete] = useState(false)
+  /** 规则存档弹窗 */
+  const [backupOpen, setBackupOpen] = useState(false)
+  /** 正在用存档覆盖规则文件 */
+  const [restoring, setRestoring] = useState(false)
 
   useEffect(() => {
     void mutateProfiles()
@@ -130,6 +139,7 @@ const CustomRulesPage = () => {
     setSavedSeq,
     excludeSubscriptionRules,
     setExcludeSubscriptionRules,
+    resetContent,
   } = useSeqRuleConfig(selected?.option?.rules ?? '', !!selected)
 
   const rulesProperty = selected?.option?.rules
@@ -307,6 +317,39 @@ const CustomRulesPage = () => {
     setDeletePicked({ uid: selectedUid, ids: [] })
     void saveDraft(next)
   }
+
+  /**
+   * 用存档覆盖规则文件：写回前当前版本会由后端先存为一份存档，
+   * 写回成功后重启内核并重新读取规则，界面回到该存档的内容。
+   */
+  const handleRestoreBackup = useLockFn(async (backup: SeqRulesBackup) => {
+    if (!rulesProperty) return
+
+    setRestoring(true)
+    try {
+      const task = writeQueueRef.current.then(async () => {
+        const outcome = await saveRulesFile(rulesProperty, backup.content)
+        if (outcome.status !== 'valid') return false
+
+        // mihomo 的热重载不一定采用新规则，写回后显式重启内核
+        await restartCore()
+        return true
+      })
+      writeQueueRef.current = task.catch(() => undefined)
+
+      if (!(await task)) return
+
+      setDeletePicked({ uid: selectedUid, ids: [] })
+      setDirtyUid('')
+      await resetContent()
+      showNotice.success(t('rules.custom.page.backup.feedback.restored'))
+      setBackupOpen(false)
+    } catch (err: any) {
+      showNotice.error(err)
+    } finally {
+      setRestoring(false)
+    }
+  })
 
   /** 编辑规则属性：原位置的规则改成新规则，重复的旧规则一并排除，只改本地草稿 */
   const handleEditRule = (row: SeqRuleRow, nextRule: string) => {
@@ -500,6 +543,16 @@ const CustomRulesPage = () => {
               <Button
                 size="small"
                 variant="outlined"
+                startIcon={<RestoreRounded />}
+                disabled={!rulesProperty}
+                sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                onClick={() => setBackupOpen(true)}
+              >
+                {t('rules.custom.page.backup.action')}
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
                 color="error"
                 startIcon={<DeleteForeverRounded />}
                 disabled={deleteIds.length === 0}
@@ -569,6 +622,15 @@ const CustomRulesPage = () => {
               })}
             </Typography>
           </BaseDialog>
+          <SeqRulesBackupDialog
+            open={backupOpen}
+            property={rulesProperty ?? ''}
+            restoring={restoring}
+            onClose={() => setBackupOpen(false)}
+            onRestore={(backup) => {
+              void handleRestoreBackup(backup)
+            }}
+          />
         </>
       ) : (
         <Box

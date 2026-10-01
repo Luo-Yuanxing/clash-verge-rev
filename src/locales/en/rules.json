@@ -29,6 +29,18 @@
         "confirmTitle": "Delete rules",
         "confirmText": "Delete the {{count}} selected rules? This cannot be undone."
       },
+      "backup": {
+        "action": "Restore",
+        "dialogTitle": "Rules backups",
+        "entry": "{{count}} rules · {{size}}",
+        "empty": "This profile has no backup yet",
+        "preview": "Backup content",
+        "hint": "Every save keeps the previous version automatically, up to 10 backups",
+        "restore": "Restore this backup",
+        "feedback": {
+          "restored": "Backup restored; the core restarted"
+        }
+      },
       "migrate": {
         "action": "Migrate",
         "feedback": {
