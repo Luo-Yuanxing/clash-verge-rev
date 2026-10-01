@@ -56,6 +56,8 @@
       "hint": "Hides history rows with the exact same hostname; ports are ignored and subdomains do not match: blocking api.example.com keeps www.example.com visible",
       "empty": "The blocklist is empty",
       "add": "Block hosts",
+      "search": "Search hosts (regex supported)",
+      "noMatch": "No matching hosts",
       "selectAll": "Select all",
       "restore": "Restore selected",
       "added": "Blocked {{count}} host(s)",

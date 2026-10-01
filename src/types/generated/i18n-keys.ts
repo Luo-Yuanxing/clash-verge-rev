@@ -41,6 +41,8 @@ export const translationKeys = [
   'connections.components.blocklist.hint',
   'connections.components.blocklist.empty',
   'connections.components.blocklist.add',
+  'connections.components.blocklist.search',
+  'connections.components.blocklist.noMatch',
   'connections.components.blocklist.selectAll',
   'connections.components.blocklist.restore',
   'connections.components.blocklist.added',

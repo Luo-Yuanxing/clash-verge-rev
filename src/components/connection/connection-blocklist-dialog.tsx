@@ -17,6 +17,7 @@ import { useLockFn } from 'ahooks'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BaseSearchBox } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
 import { normalizeBlocklist } from '@/utils/connection-blocklist'
@@ -39,15 +40,29 @@ export const ConnectionBlocklistDialog = ({ open, onClose }: Props) => {
   /** 勾选待恢复的条目，关闭弹窗即丢弃 */
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const [wasOpen, setWasOpen] = useState(open)
+  /** 过滤用的匹配函数，由搜索框给出（支持正则） */
+  const [match, setMatch] = useState<(host: string) => boolean>(
+    () => () => true,
+  )
 
-  // 每次打开都从当前黑名单重新开始，避免残留上次的勾选（渲染期同步，无需 effect）
+  // 每次打开都从当前黑名单重新开始，避免残留上次的勾选与搜索（渲染期同步，无需 effect）
   if (wasOpen !== open) {
     setWasOpen(open)
-    if (open) setSelected(new Set())
+    if (open) {
+      setSelected(new Set())
+      setMatch(() => () => true)
+    }
   }
 
-  const allSelected = hosts.length > 0 && selected.size === hosts.length
-  const someSelected = selected.size > 0 && !allSelected
+  const visibleHosts = useMemo(
+    () => hosts.filter((host) => match(host)),
+    [hosts, match],
+  )
+
+  const allSelected =
+    visibleHosts.length > 0 && visibleHosts.every((host) => selected.has(host))
+  const someSelected =
+    !allSelected && visibleHosts.some((host) => selected.has(host))
 
   const toggle = (host: string) => {
     setSelected((current) => {
@@ -61,8 +76,19 @@ export const ConnectionBlocklistDialog = ({ open, onClose }: Props) => {
     })
   }
 
+  /** 全选只作用于当前可见（过滤后）的条目，搜索时不会误改被隐藏的勾选 */
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(hosts))
+    setSelected((current) => {
+      const next = new Set(current)
+      for (const host of visibleHosts) {
+        if (allSelected) {
+          next.delete(host)
+        } else {
+          next.add(host)
+        }
+      }
+      return next
+    })
   }
 
   const handleRestore = useLockFn(async () => {
@@ -104,12 +130,19 @@ export const ConnectionBlocklistDialog = ({ open, onClose }: Props) => {
           </Typography>
         ) : (
           <>
+            <Box sx={{ mb: 1 }}>
+              <BaseSearchBox
+                placeholder={t('connections.components.blocklist.search')}
+                onSearch={(next) => setMatch(() => next)}
+              />
+            </Box>
             <FormControlLabel
               control={
                 <Checkbox
                   size="small"
                   checked={allSelected}
                   indeterminate={someSelected}
+                  disabled={visibleHosts.length === 0}
                   onChange={toggleAll}
                 />
               }
@@ -120,29 +153,39 @@ export const ConnectionBlocklistDialog = ({ open, onClose }: Props) => {
               }
             />
             <Divider />
-            <Box sx={{ maxHeight: 320, overflow: 'auto' }}>
-              <List dense disablePadding>
-                {hosts.map((host) => (
-                  <ListItem key={host} disableGutters sx={{ py: 0.25 }}>
-                    <Checkbox
-                      size="small"
-                      edge="start"
-                      checked={selected.has(host)}
-                      onChange={() => toggle(host)}
-                    />
-                    <ListItemText
-                      primary={host}
-                      slotProps={{
-                        primary: {
-                          variant: 'body2',
-                          sx: { wordBreak: 'break-all' },
-                        },
-                      }}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
+            {visibleHosts.length === 0 ? (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ py: 2, textAlign: 'center' }}
+              >
+                {t('connections.components.blocklist.noMatch')}
+              </Typography>
+            ) : (
+              <Box sx={{ maxHeight: 320, overflow: 'auto' }}>
+                <List dense disablePadding>
+                  {visibleHosts.map((host) => (
+                    <ListItem key={host} disableGutters sx={{ py: 0.25 }}>
+                      <Checkbox
+                        size="small"
+                        edge="start"
+                        checked={selected.has(host)}
+                        onChange={() => toggle(host)}
+                      />
+                      <ListItemText
+                        primary={host}
+                        slotProps={{
+                          primary: {
+                            variant: 'body2',
+                            sx: { wordBreak: 'break-all' },
+                          },
+                        }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
           </>
         )}
       </DialogContent>

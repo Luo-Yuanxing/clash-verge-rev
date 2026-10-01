@@ -22,8 +22,10 @@ export interface TranslationResources {
           added: string
           empty: string
           hint: string
+          noMatch: string
           restore: string
           restored: string
+          search: string
           selectAll: string
           title: string
         }

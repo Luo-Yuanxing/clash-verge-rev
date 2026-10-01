@@ -56,6 +56,8 @@
       "hint": "只隐藏历史列表里的同名主机，按域名严格匹配且不算端口：黑名单中的 api.example.com 不会隐藏 www.example.com",
       "empty": "黑名单为空",
       "add": "加入黑名单",
+      "search": "搜索主机（支持正则）",
+      "noMatch": "没有匹配的主机",
       "selectAll": "全选",
       "restore": "恢复所选",
       "added": "已加入黑名单 {{count}} 个主机",
