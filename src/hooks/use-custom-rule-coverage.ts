@@ -26,6 +26,8 @@ export const useCustomRuleCoverage = (active = true) => {
   const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
+    // 无条件的来源日志：连接页挂载过就一定有输出，便于区分“没跑”与“跑了但规则为空”
+    debugLog('[custom-rules] 覆盖判断来源', { active, property })
     if (!active || !property) return
 
     let cancelled = false
