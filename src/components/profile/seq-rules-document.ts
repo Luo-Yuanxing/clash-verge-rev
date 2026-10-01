@@ -62,6 +62,25 @@ export const emptySeqRulesConfig = (): SeqRulesConfig => ({
   excludeSubscriptionRules: false,
 })
 
+/** 顺序也要一致：规则顺序参与运行时匹配，顺序不同即视为不同草稿 */
+const sameList = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((item, index) => item === b[index])
+
+/**
+ * 两份草稿是否内容一致：草稿对象每次渲染都会重建，异步写回只能按内容判断
+ * 它是否还是界面上正在显示的那一份。
+ */
+export const isSameSeqRulesConfig = (
+  a: SeqRulesConfig,
+  b: SeqRulesConfig,
+): boolean =>
+  a.excludeSubscriptionRules === b.excludeSubscriptionRules &&
+  sameList(a.prepend, b.prepend) &&
+  sameList(a.append, b.append) &&
+  sameList(a.delete, b.delete) &&
+  sameList(a.disabled.prepend, b.disabled.prepend) &&
+  sameList(a.disabled.append, b.disabled.append)
+
 /** 有没有实质内容：四个序列都空且没开启「完全排除订阅规则」时视为空 */
 export const hasSeqRules = (config: SeqRulesConfig): boolean =>
   config.prepend.length > 0 ||

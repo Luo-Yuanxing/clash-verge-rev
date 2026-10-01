@@ -6,6 +6,7 @@ import {
   emptySeqRulesConfig,
   findFirstNonEmptyRulesUid,
   hasSeqRules,
+  isSameSeqRulesConfig,
   mergeSeqRules,
   removeSeqRule,
   type SeqRulesConfig,
@@ -241,6 +242,26 @@ describe('removeSeqRule', () => {
     )
 
     expect(next.disabled.append).toEqual([])
+  })
+})
+
+describe('isSameSeqRulesConfig', () => {
+  it('compares by content, not by reference', () => {
+    const source = config({ prepend: ['DOMAIN,a.com,DIRECT'] })
+
+    expect(isSameSeqRulesConfig(source, { ...source })).toBe(true)
+    expect(isSameSeqRulesConfig(source, config({ prepend: [] }))).toBe(false)
+  })
+
+  it('treats a different order as a different draft', () => {
+    const source = config({
+      prepend: ['DOMAIN,a.com,DIRECT', 'DOMAIN,b.com,DIRECT'],
+    })
+    const reordered = config({
+      prepend: ['DOMAIN,b.com,DIRECT', 'DOMAIN,a.com,DIRECT'],
+    })
+
+    expect(isSameSeqRulesConfig(source, reordered)).toBe(false)
   })
 })
 

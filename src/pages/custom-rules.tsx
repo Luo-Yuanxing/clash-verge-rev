@@ -23,6 +23,7 @@ import {
 import {
   applyRuleEnabled,
   findFirstNonEmptyRulesUid,
+  isSameSeqRulesConfig,
   readSeqRulesDocument,
   removeSeqRule,
   type SeqRulesConfig,
@@ -195,6 +196,8 @@ const CustomRulesPage = () => {
 
   /** 最近一次显示在界面上的草稿：判断后台写回失败时是否还能回滚 */
   const draftRef = useRef<SeqRulesConfig>(draft)
+  /** 规则文件是异步读入的，草稿在首次渲染之后才成形，每次渲染都要把最新草稿记下来 */
+  draftRef.current = draft
   /** 后台写回队列：连续操作串行落盘，避免两次写同一个文件互相覆盖 */
   const writeQueueRef = useRef<Promise<unknown>>(Promise.resolve())
 
@@ -222,11 +225,11 @@ const CustomRulesPage = () => {
       )
 
       if (outcome.status !== 'valid') {
-        if (draftRef.current === next) applyDraft(prev)
+        if (isSameSeqRulesConfig(draftRef.current, next)) applyDraft(prev)
         return false
       }
 
-      if (draftRef.current !== next) return true
+      if (!isSameSeqRulesConfig(draftRef.current, next)) return true
 
       // mihomo 的热重载不一定采用新规则，保存后显式重启内核
       await restartCore()
@@ -245,7 +248,7 @@ const CustomRulesPage = () => {
 
       return true
     } catch (err: any) {
-      if (draftRef.current === next) applyDraft(prev)
+      if (isSameSeqRulesConfig(draftRef.current, next)) applyDraft(prev)
       showNotice.error(err)
       return false
     }
@@ -295,9 +298,10 @@ const CustomRulesPage = () => {
     const targets = rows.filter((row) => picked.has(seqRuleRowId(row)))
     if (targets.length === 0) return
 
+    // 必须从界面上正在显示的草稿出发：规则文件异步读入，挂载时的草稿还是空的
     const next = targets.reduce(
       (config, row) => removeSeqRule(config, row),
-      draftRef.current,
+      draft,
     )
 
     setDeletePicked({ uid: selectedUid, ids: [] })
