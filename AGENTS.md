@@ -9,7 +9,8 @@
 ## 分支与推送
 
 - 所有提交与推送**只发生在 `feat/custom-rules-page` 分支**上。
-- **永不**把该分支合并进 `main` 或 `dev`；也不要把 `main`/`dev` 合并进来（需要上游修复时用 rebase 或 cherry-pick）。
+- **暂不**把该分支合并进 `main` 或 `dev`；也不要把 `main`/`dev` 合并进来（需要上游修复时用 rebase 或 cherry-pick）。
+- 除非用户明确要求操作
 - 不创建 Pull Request，不推送 `main`/`dev`。
 - `origin` 是本人的 fork，SSH 走 443 端口（22 端口被阻断）：
   `ssh://git@ssh.github.com:443/Luo-Yuanxing/clash-verge-rev.git`
